@@ -9,6 +9,7 @@ export interface ScrapedJob {
   description: string;
   requirements: string[];
   publishedDate?: Date;
+  source?: string; // e.g., "finn.no", "manpower", "adecco"
 }
 
 export interface ScraperConfig {
@@ -34,7 +35,7 @@ export class BrowserManager {
   static async getBrowser(): Promise<Browser> {
     if (!this.instance) {
       this.instance = await puppeteer.launch({
-        headless: 'new',
+        headless: true,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -116,7 +117,6 @@ export class ScraperService {
       
       // Remove webdriver property that can be detected
       await page.evaluateOnNewDocument(() => {
-        // @ts-expect-error - navigator properties
         Object.defineProperty(navigator, 'webdriver', {
           get: () => false,
         });
@@ -124,7 +124,7 @@ export class ScraperService {
       
       // Add Chrome properties
       await page.evaluateOnNewDocument(() => {
-        // @ts-expect-error - window properties
+        // @ts-ignore - Adding chrome property for bot detection evasion
         window.chrome = {
           runtime: {},
         };
@@ -214,7 +214,6 @@ export class ScraperService {
       
       // Prøv flere strategier for å finne jobber
       const jobs = await page.evaluate((selectors) => {
-        // @ts-expect-error - document is available in browser context
         let jobElements = document.querySelectorAll(selectors.jobList);
         
         // Hvis ingen jobber funnet med hoved-selector, prøv alternative selectors
@@ -237,7 +236,6 @@ export class ScraperService {
         
         const jobs: ScrapedJob[] = [];
 
-        // @ts-expect-error - NodeList types are available in browser context
         jobElements.forEach((element: Element) => {
           try {
             // Prøv flere selectors for hvert felt
@@ -245,7 +243,6 @@ export class ScraperService {
                          element.querySelector('h2, h3, h4, a[href*="job"], a[href*="stilling"]')?.textContent?.trim() || '';
             const company = element.querySelector(selectors.company)?.textContent?.trim() || '';
             const location = element.querySelector(selectors.location)?.textContent?.trim() || '';
-            // @ts-expect-error - HTMLAnchorElement is available in browser context
             const linkElement = (element.querySelector(selectors.link) as HTMLAnchorElement) || 
                                (element.querySelector('a[href*="job"], a[href*="stilling"]') as HTMLAnchorElement);
             const link = linkElement?.href || '';
@@ -266,7 +263,6 @@ export class ScraperService {
                     absoluteUrl = `${urlObj.protocol}//${urlObj.host}${link}`;
                   } else {
                     // Relativ path - legg til baseUrl
-                    const baseUrlObj = new URL(baseUrl);
                     absoluteUrl = new URL(link, baseUrl).href;
                   }
                 } catch (urlError) {
@@ -393,7 +389,6 @@ export class ScraperService {
 
       const details = await page.evaluate(() => {
         const getTextContent = (selector: string) => {
-          // @ts-expect-error - document is available in browser context
           const element = document.querySelector(selector);
           return element?.textContent?.trim() || '';
         };

@@ -138,7 +138,6 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
     const adeccoScraper = new AdeccoScraper();
 
     const allJobs: ScrapedJob[] = [];
-    const aiService = getAIService();
 
     // Scrape Finn.no - bruk bare de 2-3 beste søketermene for raskere resultater
     logInfo('Scraping Finn.no...', { queries: searchQueries.slice(0, 3), location });
@@ -163,7 +162,8 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
     const finnResults = await Promise.allSettled(finnPromises);
     for (const result of finnResults) {
       if (result.status === 'fulfilled') {
-        allJobs.push(...result.value);
+        const jobsWithSource = result.value.map(job => ({ ...job, source: 'finn.no' }));
+        allJobs.push(...jobsWithSource);
         logInfo(`Finn.no scraped ${result.value.length} jobs`, { 
           query: queriesToScrape[finnResults.indexOf(result)],
           location 
@@ -195,7 +195,8 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
     // Handle Manpower results
     if (manpowerJobs.status === 'fulfilled') {
       logInfo(`Manpower scraped ${manpowerJobs.value.length} jobs`);
-      allJobs.push(...manpowerJobs.value);
+      const jobsWithSource = manpowerJobs.value.map(job => ({ ...job, source: 'manpower' }));
+      allJobs.push(...jobsWithSource);
     } else {
       logError('Error scraping Manpower', manpowerJobs.reason as Error);
     }
@@ -203,7 +204,8 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
     // Handle Adecco results
     if (adeccoJobs.status === 'fulfilled') {
       logInfo(`Adecco scraped ${adeccoJobs.value.length} jobs`);
-      allJobs.push(...adeccoJobs.value);
+      const jobsWithSource = adeccoJobs.value.map(job => ({ ...job, source: 'adecco' }));
+      allJobs.push(...jobsWithSource);
     } else {
       logError('Error scraping Adecco', adeccoJobs.reason as Error);
     }
@@ -226,7 +228,7 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
       } else {
         // If we found a duplicate by title+company, prefer the one with better URL
         const existing = uniqueJobsByTitleCompany.get(titleCompanyKey);
-        if (job.url.length > existing.url.length || job.url.includes('http')) {
+        if (existing && (job.url.length > existing.url.length || job.url.includes('http'))) {
           uniqueJobsByTitleCompany.set(titleCompanyKey, job);
         }
       }
@@ -248,7 +250,7 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
     for (const job of uniqueJobs) {
       try {
         // Use upsert - it handles both create and update automatically
-        const result = await prisma.jobListing.upsert({
+        await prisma.jobListing.upsert({
           where: { url: job.url },
           update: {
             title: job.title,
@@ -256,7 +258,7 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
             location: job.location,
             description: job.description,
             requirements: job.requirements,
-            source: job.source,
+            source: job.source || 'unknown',
             scrapedAt: new Date(), // Update scraped timestamp
           },
           create: {
@@ -266,7 +268,7 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
             url: job.url,
             description: job.description,
             requirements: job.requirements,
-            source: job.source,
+            source: job.source || 'unknown',
             publishedDate: job.publishedDate,
             scrapedAt: new Date(),
           },
@@ -305,6 +307,10 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
     });
   } catch (error) {
     const duration = Date.now() - startTime;
+    const keywords = (typeof req.body?.q === 'string' ? req.body.q : undefined) ||
+                     (typeof req.query.q === 'string' ? req.query.q : undefined);
+    const location = (typeof req.body?.location === 'string' ? req.body.location : undefined) ||
+                     (typeof req.query.location === 'string' ? req.query.location : undefined);
     logError('Error refreshing jobs', error as Error, { 
       durationMs: duration,
       keywords,

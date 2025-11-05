@@ -1,4 +1,4 @@
-import { ScraperConfig, ScrapedJob } from './ScraperService';
+import { ScrapedJob } from './ScraperService';
 import { BaseScraper } from './BaseScraper';
 
 export class ManpowerScraper extends BaseScraper {

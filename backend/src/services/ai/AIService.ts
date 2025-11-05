@@ -408,6 +408,10 @@ Respond in JSON format with:
   "explanation": "<brief explanation in Norwegian>"
 }`;
 
+      if (!this.openai) {
+        return this.getMockMatchScore(jobRequirements, userSkills);
+      }
+
       const response = await this.openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
@@ -455,6 +459,14 @@ Target Jobs: ${targetJobTitles.join(', ')}
 
 Respond with only a JSON array of suggestions in Norwegian:
 ["suggestion1", "suggestion2", "suggestion3"]`;
+
+      if (!this.openai) {
+        return [
+          'Vurder å lære flere relevante verktøy',
+          'Tilegn deg mer erfaring innen ditt felt',
+          'Bygg ut nettverk i bransjen',
+        ];
+      }
 
       const response = await this.openai.chat.completions.create({
         model: 'gpt-4o',
@@ -510,6 +522,10 @@ Søknadsbrevet skal:
 5. Være skrevet på norsk`;
   }
 
+  // Removed unused method - kept for reference but not used
+  // Commented out to avoid TypeScript errors
+  /* eslint-disable */
+  /*
   private buildCoverLetterPromptWithCV(
     jobTitle: string,
     company: string,
@@ -638,6 +654,7 @@ SØKNADSBREVET MÅ VÆRE:
 
 START Å SKRIVE NÅ. Hver setning må ha et ankerpunkt i CV-innholdet du har fått.`;
   }
+  */
 
   /**
    * Call OpenRouter API (GRATIS tier med open source modeller)

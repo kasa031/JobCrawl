@@ -1,4 +1,4 @@
-import { ScraperConfig, ScrapedJob } from './ScraperService';
+import { ScrapedJob } from './ScraperService';
 import { BaseScraper } from './BaseScraper';
 import { logWarn, logInfo } from '../../config/logger';
 

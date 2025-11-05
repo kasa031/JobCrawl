@@ -1,12 +1,12 @@
 import { ScraperService, ScraperConfig, ScrapedJob } from './ScraperService';
-import { logInfo, logError, logWarn } from '../../config/logger';
+import { logInfo, logError } from '../../config/logger';
 
 /**
  * Base class for all scrapers with common functionality
  */
 export abstract class BaseScraper {
   protected scraperService: ScraperService;
-  protected config: ScraperConfig;
+  protected config!: ScraperConfig; // Definite assignment - set in subclasses
 
   constructor() {
     this.scraperService = new ScraperService();
@@ -80,7 +80,7 @@ export abstract class BaseScraper {
    * Optional: Scrape with filters (keywords, location)
    * Default implementation just calls scrape()
    */
-  async scrapeWithFilters(keywords?: string, location?: string): Promise<ScrapedJob[]> {
+  async scrapeWithFilters(_keywords?: string, _location?: string): Promise<ScrapedJob[]> {
     return this.scrape();
   }
 
