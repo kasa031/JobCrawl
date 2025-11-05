@@ -1,0 +1,111 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Authentication
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  fullName      String    @map("full_name")
+  emailVerified Boolean   @default(false) @map("email_verified")
+  emailVerificationToken String? @map("email_verification_token")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  profile       Profile?
+  applications  Application[]
+  
+  @@map("users")
+}
+
+// User Profile with CV and preferences
+model Profile {
+  id            String    @id @default(uuid())
+  userId        String    @unique @map("user_id")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  cvPath        String?   @map("cv_path")
+  skills        String[]
+  experience    Int       @default(0) // years
+  education     String?
+  location      String?
+  phone         String?
+  bio           String?   @db.Text
+  
+  preferences   Json?     // Flexible preferences storage
+  
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  @@map("profiles")
+}
+
+// Scraped Job Listings
+model JobListing {
+  id            String    @id @default(uuid())
+  title         String
+  company       String
+  location      String
+  url           String    @unique
+  description   String    @db.Text
+  requirements  String[]  @default([])
+  source        String    // e.g., "finn.no", "manpower", "adecco"
+  
+  publishedDate DateTime? @map("published_date")
+  scrapedAt     DateTime  @default(now()) @map("scraped_at")
+  
+  applications  Application[]
+  
+  @@index([source])
+  @@index([scrapedAt])
+  @@map("job_listings")
+}
+
+// User Applications
+model Application {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  jobListingId  String    @map("job_listing_id")
+  jobListing    JobListing @relation(fields: [jobListingId], references: [id])
+  
+  status        ApplicationStatus @default(PENDING)
+  coverLetter   String?   @db.Text @map("cover_letter") // AI-generated
+  cvPath        String?   @map("cv_path") // Custom CV for this application
+  
+  sentDate      DateTime? @map("sent_date")
+  responseDate  DateTime? @map("response_date")
+  response      String?   @db.Text
+  
+  notes         String?   @db.Text
+  
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  
+  @@unique([userId, jobListingId])
+  @@index([userId])
+  @@index([status])
+  @@map("applications")
+}
+
+enum ApplicationStatus {
+  DRAFT
+  PENDING
+  SENT
+  VIEWED
+  REJECTED
+  ACCEPTED
+  INTERVIEW
+  OFFER
+}
+

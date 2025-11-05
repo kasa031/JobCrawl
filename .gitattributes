@@ -1,0 +1,6 @@
+# Sørg for at env-filer ikke committes
+backend/env linguist-vendored
+frontend/env linguist-vendored
+*.env linguist-vendored
+env linguist-vendored
+

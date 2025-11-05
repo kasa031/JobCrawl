@@ -1,0 +1,20 @@
+Slik legger du inn App-passordet i backend/env:
+
+1. Åpne backend/env i en tekstredigerer (Notepad, VS Code, etc.)
+
+2. Finn disse linjene:
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=ditt_gmail@gmail.com
+SMTP_PASSWORD=
+
+3. Fyll inn:
+- SMTP_USER: din_google@gmail.com
+- SMTP_PASSWORD: app-passordet du fikk (uten mellomrom!)
+  For eksempel: abcdefghijklmnop
+
+4. SAVE filen
+
+5. Restart backend (stopp og start på nytt)
+
+DONE! 🎉

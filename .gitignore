@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build outputs
+dist/
+build/
+*/dist/
+*/build/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# CRITICAL: Ignorer også env-filer uten punktum (backend/env)
+env
+*/env
+backend/env
+frontend/env
+# API keys og sensitive data
+*_API_KEY*
+*_SECRET*
+*_PASSWORD*
+*_TOKEN*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Database
+*.sqlite
+*.db
+
+# Misc
+.cache/
+temp/
+tmp/
+

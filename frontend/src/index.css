@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --mocca-50: #FAF5F0;
+    --mocca-100: #F5ECE2;
+    --mocca-200: #E8D5C1;
+    --mocca-300: #D4B99A;
+    --mocca-400: #C29B73;
+    --mocca-500: #A67E5A;
+    --mocca-600: #8B6B47;
+    --mocca-700: #6B5439;
+    
+    --text-primary: #3D2F1F;
+    --text-heading: #2A2018;
+    --text-subheading: #4A3F2F;
+    --text-secondary: #6B5439;
+    
+    --champaigne: #F7E7CE;
+    --accent: #B8956A;
+  }
+  
+  * {
+    @apply border-mocca-200;
+  }
+  
+  body {
+    @apply bg-mocca-50 text-dark-text antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-dark-heading font-bold;
+  }
+  
+  h1 {
+    @apply text-4xl;
+  }
+  
+  h2 {
+    @apply text-3xl;
+  }
+  
+  h3 {
+    @apply text-2xl;
+  }
+  
+  h4 {
+    @apply text-xl;
+  }
+  
+  h5 {
+    @apply text-lg;
+  }
+  
+  h6 {
+    @apply text-base;
+  }
+}
