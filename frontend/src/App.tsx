@@ -7,6 +7,7 @@ import JobsList from './pages/JobsList';
 import JobDetail from './pages/JobDetail';
 import AIGenerate from './pages/AIGenerate';
 import Applications from './pages/Applications';
+import About from './pages/About';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           <Route path="jobs/:id" element={<JobDetail />} />
           <Route path="ai-generate" element={<AIGenerate />} />
           <Route path="applications" element={<Applications />} />
+          <Route path="about" element={<About />} />
         </Route>
       </Routes>
     </BrowserRouter>

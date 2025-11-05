@@ -15,6 +15,7 @@ function Layout() {
     { path: '/ai-generate', label: 'AI Generate' },
     { path: '/applications', label: 'Applications' },
     { path: '/profile', label: 'My Profile' },
+    { path: '/about', label: 'Om meg' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -165,7 +166,7 @@ function Layout() {
       <footer className="bg-mocca-100 mt-12 py-8">
         <div className="container mx-auto px-4 text-center text-dark-secondary">
           <p className="font-semibold">JobCrawl - Intelligent Job Application Assistant</p>
-          <p className="text-sm mt-2">© 2026 Bachelor Project</p>
+          <p className="text-sm mt-2">© 2026 ms.tery</p>
         </div>
       </footer>
 
