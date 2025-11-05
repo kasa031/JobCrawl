@@ -110,6 +110,7 @@ export const jobsAPI = {
 
 // Profile API
 interface ProfileData {
+  fullName?: string;
   skills?: string[];
   experience?: number;
   education?: string;
