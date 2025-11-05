@@ -10,7 +10,7 @@ import Applications from './pages/Applications';
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/JobCrawl">
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
