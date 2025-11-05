@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JobCrawl</title>
+    <script>
+      // Redirect to index.html for React Router
+      var path = window.location.pathname;
+      var basePath = '/JobCrawl';
+      var indexPath = basePath + '/index.html';
+      
+      // If we're not already at index.html, redirect
+      if (!path.endsWith('/index.html') && path !== basePath && path !== basePath + '/') {
+        window.location.replace(indexPath);
+      } else {
+        // If we're at root, redirect to index.html
+        window.location.replace(indexPath);
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+

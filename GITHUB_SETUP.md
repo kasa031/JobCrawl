@@ -41,26 +41,30 @@
 
 ## 🌐 Sette opp GitHub Pages
 
-**Valg 1: Frontend publisering (anbefalt)**
+**✅ Automatisk deploy med GitHub Actions (ANBEFALT)**
+
+GitHub Actions vil automatisk bygge og deploye frontend hver gang du pusher til `main` branch.
 
 1. Gå til: https://github.com/kasa031/JobCrawl/settings/pages
 2. Under **"Source"**:
-   - Velg branch: **`main`**
-   - Velg folder: **`/ (root)`** eller **`/frontend/dist`** (hvis du har bygget frontend)
+   - Velg: **`GitHub Actions`** (ikke "Deploy from a branch")
 3. Klikk **"Save"**
-4. Vent 1-2 minutter, så får du en lenke: `https://kasa031.github.io/JobCrawl/`
+4. Gå til: https://github.com/kasa031/JobCrawl/actions
+5. Vent til workflow-en er ferdig (1-2 minutter)
+6. Gå tilbake til: https://github.com/kasa031/JobCrawl/settings/pages
+7. Du vil se lenken: `https://kasa031.github.io/JobCrawl/`
 
-**⚠️ Merk:** Hvis du velger root, må du bygge frontend først:
-```powershell
-cd frontend
-npm run build
-```
+**📱 Nettleser på mobil:**
+- Åpne: `https://kasa031.github.io/JobCrawl/`
+- Du skal nå se appen, ikke bare README
 
-**Valg 2: Dokumentasjon (enklere)**
-
-Hvis du vil publisere dokumentasjon i stedet:
-1. Opprett en `docs` mappe med `index.html`
-2. Velg branch: `main`, folder: `/docs`
+**🔧 Hvis GitHub Actions ikke vises:**
+1. Gå til: https://github.com/kasa031/JobCrawl/settings/pages
+2. Under **"Source"**:
+   - Velg branch: **`main`**
+   - Velg folder: **`/frontend/dist`**
+3. Klikk **"Save"**
+4. Vent 1-2 minutter
 
 ---
 

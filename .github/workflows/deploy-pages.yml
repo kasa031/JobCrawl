@@ -41,6 +41,12 @@ jobs:
         working-directory: ./frontend
         run: npm run build
 
+      - name: Copy 404.html for React Router
+        working-directory: ./frontend/dist
+        run: |
+          cp index.html 404.html
+          echo "/.nojekyll" > .nojekyll
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
