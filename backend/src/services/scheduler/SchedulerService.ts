@@ -3,6 +3,7 @@ import { FinnNoScraper } from '../scraper/FinnNoScraper';
 import { ManpowerScraper } from '../scraper/ManpowerScraper';
 import { AdeccoScraper } from '../scraper/AdeccoScraper';
 import { ArbeidsplassenScraper } from '../scraper/ArbeidsplassenScraper';
+import { KarriereScraper } from '../scraper/KarriereScraper';
 import { deduplicateJobs } from '../../utils/deduplication';
 import prisma from '../../config/database';
 import { ScrapedJob } from '../scraper/ScraperService';
@@ -78,15 +79,17 @@ class SchedulerService {
       const manpowerScraper = new ManpowerScraper();
       const adeccoScraper = new AdeccoScraper();
       const arbeidsplassenScraper = new ArbeidsplassenScraper();
+      const karriereScraper = new KarriereScraper();
 
       const allJobs: ScrapedJob[] = [];
 
       // Scrape from all sources in parallel
-      const [finnJobs, manpowerJobs, adeccoJobs, arbeidsplassenJobs] = await Promise.allSettled([
+      const [finnJobs, manpowerJobs, adeccoJobs, arbeidsplassenJobs, karriereJobs] = await Promise.allSettled([
         finnScraper.scrapeWithFilters(keywords, location),
         manpowerScraper.scrapeWithFilters(keywords, location),
         adeccoScraper.scrapeWithFilters(keywords, location),
         arbeidsplassenScraper.scrapeWithFilters(keywords, location),
+        karriereScraper.scrapeWithFilters(keywords, location),
       ]);
 
       // Handle Finn.no results
@@ -123,6 +126,15 @@ class SchedulerService {
         allJobs.push(...jobsWithSource);
       } else {
         logError('Error scraping Arbeidsplassen in scheduled job', arbeidsplassenJobs.reason as Error);
+      }
+
+      // Handle Karriere results
+      if (karriereJobs.status === 'fulfilled') {
+        logInfo(`Karriere scraped ${karriereJobs.value.length} jobs`);
+        const jobsWithSource = karriereJobs.value.map((job) => ({ ...job, source: 'karriere' }));
+        allJobs.push(...jobsWithSource);
+      } else {
+        logError('Error scraping Karriere in scheduled job', karriereJobs.reason as Error);
       }
 
       // Deduplicate jobs

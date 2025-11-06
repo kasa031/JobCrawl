@@ -4,6 +4,7 @@ import { FinnNoScraper } from '../services/scraper/FinnNoScraper';
 import { ManpowerScraper } from '../services/scraper/ManpowerScraper';
 import { AdeccoScraper } from '../services/scraper/AdeccoScraper';
 import { ArbeidsplassenScraper } from '../services/scraper/ArbeidsplassenScraper';
+import { KarriereScraper } from '../services/scraper/KarriereScraper';
 import { ScrapedJob } from '../services/scraper/ScraperService';
 import { logError, logInfo } from '../config/logger';
 import { AIService } from '../services/ai/AIService';
@@ -156,6 +157,7 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
     const manpowerScraper = new ManpowerScraper();
     const adeccoScraper = new AdeccoScraper();
     const arbeidsplassenScraper = new ArbeidsplassenScraper();
+    const karriereScraper = new KarriereScraper();
 
     const allJobs: ScrapedJob[] = [];
 
@@ -193,7 +195,7 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
 
     // Scrape other sources with filters if provided
     // Run in parallel for better performance
-    const [manpowerJobs, adeccoJobs, arbeidsplassenJobs] = await Promise.allSettled([
+    const [manpowerJobs, adeccoJobs, arbeidsplassenJobs, karriereJobs] = await Promise.allSettled([
       Promise.race([
         keywords || location 
           ? manpowerScraper.scrapeWithFilters(keywords || '', location)
@@ -216,6 +218,14 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
           : arbeidsplassenScraper.scrape(),
         new Promise<ScrapedJob[]>((_, reject) => 
           setTimeout(() => reject(new Error('Arbeidsplassen scraping timeout')), 45000)
+        ),
+      ]),
+      Promise.race([
+        keywords || location 
+          ? karriereScraper.scrapeWithFilters(keywords || '', location)
+          : karriereScraper.scrape(),
+        new Promise<ScrapedJob[]>((_, reject) => 
+          setTimeout(() => reject(new Error('Karriere scraping timeout')), 45000)
         ),
       ]),
     ]);
@@ -245,6 +255,15 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
       allJobs.push(...jobsWithSource);
     } else {
       logError('Error scraping Arbeidsplassen', arbeidsplassenJobs.reason as Error);
+    }
+
+    // Handle Karriere results
+    if (karriereJobs.status === 'fulfilled') {
+      logInfo(`Karriere scraped ${karriereJobs.value.length} jobs`);
+      const jobsWithSource = karriereJobs.value.map(job => ({ ...job, source: 'karriere' }));
+      allJobs.push(...jobsWithSource);
+    } else {
+      logError('Error scraping Karriere', karriereJobs.reason as Error);
     }
 
     // Improved deduplication using fuzzy matching algorithm
