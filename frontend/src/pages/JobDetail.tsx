@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-import { jobsAPI, applicationsAPI, aiAPI } from '../services/api';
+import { jobsAPI, applicationsAPI, aiAPI, favoritesAPI } from '../services/api';
 import LoginModal from '../components/LoginModal';
 import { useToast } from '../components/Toast';
 import { Skeleton } from '../components/Skeleton';
@@ -30,15 +30,52 @@ function JobDetail() {
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState('');
   const [hasApplied, setHasApplied] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [togglingFavorite, setTogglingFavorite] = useState(false);
 
   useEffect(() => {
     if (id) {
       loadJob();
       if (isAuthenticated) {
         checkIfApplied();
+        checkIfFavorite();
       }
     }
   }, [id, isAuthenticated]);
+
+  const checkIfFavorite = async () => {
+    if (!id) return;
+    try {
+      const response = await favoritesAPI.checkFavorite(id);
+      setIsFavorite(response.isFavorite);
+    } catch (error) {
+      // Silent fail
+    }
+  };
+
+  const toggleFavorite = async () => {
+    if (!id || !isAuthenticated) {
+      showToast('Du må være innlogget for å legge til favoritter', 'info');
+      return;
+    }
+
+    setTogglingFavorite(true);
+    try {
+      if (isFavorite) {
+        await favoritesAPI.removeFavorite(id);
+        setIsFavorite(false);
+        showToast('Fjernet fra favoritter', 'success');
+      } else {
+        await favoritesAPI.addFavorite(id);
+        setIsFavorite(true);
+        showToast('Lagt til i favoritter', 'success');
+      }
+    } catch (error: any) {
+      showToast(error.response?.data?.error || 'Kunne ikke oppdatere favoritter', 'error');
+    } finally {
+      setTogglingFavorite(false);
+    }
+  };
 
   const loadJob = async () => {
     try {
@@ -199,7 +236,27 @@ function JobDetail() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-4 mt-6">
+            <div className="flex gap-4 mt-6 flex-wrap">
+              {isAuthenticated && (
+                <button
+                  onClick={toggleFavorite}
+                  disabled={togglingFavorite}
+                  className={`px-6 py-3 rounded-lg font-semibold transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-mocca-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isFavorite
+                      ? 'bg-red-500 text-white hover:bg-red-600'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                  aria-label={isFavorite ? 'Fjern fra favoritter' : 'Legg til i favoritter'}
+                >
+                  {togglingFavorite ? (
+                    '⏳'
+                  ) : isFavorite ? (
+                    '❤️ Favoritt'
+                  ) : (
+                    '🤍 Legg til favoritt'
+                  )}
+                </button>
+              )}
               <a
                 href={job.url}
                 target="_blank"

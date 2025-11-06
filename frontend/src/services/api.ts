@@ -199,5 +199,28 @@ export const applicationsAPI = {
   },
 };
 
+// Favorites API
+export const favoritesAPI = {
+  getFavorites: async () => {
+    const response = await api.get('/favorites');
+    return response.data;
+  },
+
+  addFavorite: async (jobListingId: string) => {
+    const response = await api.post('/favorites', { jobListingId });
+    return response.data;
+  },
+
+  removeFavorite: async (jobListingId: string) => {
+    const response = await api.delete(`/favorites/${jobListingId}`);
+    return response.data;
+  },
+
+  checkFavorite: async (jobListingId: string) => {
+    const response = await api.get(`/favorites/${jobListingId}/check`);
+    return response.data;
+  },
+};
+
 export default api;
 

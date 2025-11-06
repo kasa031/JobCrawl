@@ -23,6 +23,7 @@ model User {
   
   profile       Profile?
   applications  Application[]
+  favorites     Favorite[]
   
   @@map("users")
 }
@@ -64,6 +65,7 @@ model JobListing {
   scrapedAt     DateTime  @default(now()) @map("scraped_at")
   
   applications  Application[]
+  favorites     Favorite[]
   
   @@index([source])
   @@index([scrapedAt])
@@ -107,5 +109,21 @@ enum ApplicationStatus {
   ACCEPTED
   INTERVIEW
   OFFER
+}
+
+// User Favorites/Bookmarks
+model Favorite {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  jobListingId  String    @map("job_listing_id")
+  jobListing    JobListing @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime  @default(now()) @map("created_at")
+  
+  @@unique([userId, jobListingId])
+  @@index([userId])
+  @@map("favorites")
 }
 

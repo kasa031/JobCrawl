@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { jobsAPI } from '../services/api';
+import { jobsAPI, favoritesAPI } from '../services/api';
 import { useToast } from '../components/Toast';
 import { JobCardSkeleton } from '../components/Skeleton';
+import { useAuth } from '../context/AuthContext';
 import { 
   saveSearchHistory, 
   getSearchHistory, 
@@ -30,12 +31,14 @@ type SortOption = 'newest' | 'oldest' | 'title' | 'company' | 'location';
 function JobsList() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { isAuthenticated } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -58,7 +61,47 @@ function JobsList() {
 
   useEffect(() => {
     setSearchHistory(getSearchHistory());
-  }, []);
+    if (isAuthenticated) {
+      loadFavorites();
+    }
+  }, [isAuthenticated]);
+
+  const loadFavorites = async () => {
+    try {
+      const response = await favoritesAPI.getFavorites();
+      const favoriteIds = new Set<string>(response.favorites?.map((j: Job) => j.id) || []);
+      setFavorites(favoriteIds);
+    } catch (error) {
+      // Silent fail - favorites are optional
+    }
+  };
+
+  const toggleFavorite = async (jobId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      showToast('Du må være innlogget for å legge til favoritter', 'info');
+      return;
+    }
+
+    try {
+      const isFavorite = favorites.has(jobId);
+      if (isFavorite) {
+        await favoritesAPI.removeFavorite(jobId);
+        setFavorites(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(jobId);
+          return newSet;
+        });
+        showToast('Fjernet fra favoritter', 'success');
+      } else {
+        await favoritesAPI.addFavorite(jobId);
+        setFavorites(prev => new Set(prev).add(jobId));
+        showToast('Lagt til i favoritter', 'success');
+      }
+    } catch (error: any) {
+      showToast(error.response?.data?.error || 'Kunne ikke oppdatere favoritter', 'error');
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -435,7 +478,7 @@ function JobsList() {
               transition={{ delay: index * 0.05 }}
             >
               <div className="flex justify-between items-start mb-4">
-                <div>
+                <div className="flex-1">
                   <h3 className="text-2xl font-bold text-dark-heading mb-2">
                     {job.title}
                   </h3>
@@ -443,9 +486,27 @@ function JobsList() {
                     {job.company} • {job.location}
                   </p>
                 </div>
-                <span className="bg-mocca-300 text-dark-text px-3 py-1 rounded-full text-sm font-semibold">
-                  {job.source}
-                </span>
+                <div className="flex items-center gap-2">
+                  {isAuthenticated && (
+                    <button
+                      onClick={(e) => toggleFavorite(job.id, e)}
+                      className={`p-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-mocca-400 ${
+                        favorites.has(job.id)
+                          ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'
+                          : 'text-gray-400 hover:bg-mocca-100 dark:hover:bg-gray-700'
+                      }`}
+                      aria-label={favorites.has(job.id) ? 'Fjern fra favoritter' : 'Legg til i favoritter'}
+                      title={favorites.has(job.id) ? 'Fjern fra favoritter' : 'Legg til i favoritter'}
+                    >
+                      <svg className="w-6 h-6" fill={favorites.has(job.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                    </button>
+                  )}
+                  <span className="bg-mocca-300 dark:bg-mocca-600 text-dark-text dark:text-gray-100 px-3 py-1 rounded-full text-sm font-semibold">
+                    {job.source}
+                  </span>
+                </div>
               </div>
               <p className="text-dark-text mb-4 line-clamp-3">
                 {job.description}
