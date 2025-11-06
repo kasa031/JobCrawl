@@ -59,8 +59,21 @@ PORT=3000
 
 **Frontend `.env`:**
 ```env
-VITE_API_URL=http://localhost:3000
+VITE_API_URL=http://localhost:3000/api
 ```
+
+## Deployment
+
+### Frontend (GitHub Pages)
+Frontend er automatisk deployet til GitHub Pages når du pusher til `main` branch.
+
+### Backend (Lokalt eller valgfritt)
+Backend kan kjøres lokalt eller deployes til en gratis hosting-tjeneste:
+- **Lokalt**: `npm run dev` i `backend/` mappen
+- **Gratis alternativer**: Render, Fly.io, Supabase, Neon
+- **Railway er IKKE nødvendig** - prosjektet fungerer perfekt lokalt
+
+Se [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) for detaljer.
 
 ## Color Palette
 The application uses a beautiful mocca/champagne color scheme:
