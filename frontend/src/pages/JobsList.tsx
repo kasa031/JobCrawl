@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { jobsAPI } from '../services/api';
 import { useToast } from '../components/Toast';
+import { JobCardSkeleton } from '../components/Skeleton';
 
 interface Job {
   id: string;
@@ -138,9 +139,17 @@ function JobsList() {
   if (loading && jobs.length === 0) {
     return (
       <div className="max-w-6xl mx-auto">
-        <div className="text-center py-16">
-          <div className="animate-spin text-4xl mb-4">⏳</div>
-          <p className="text-dark-text">Laster stillinger...</p>
+        <motion.h1 
+          className="text-4xl font-bold text-dark-heading mb-6"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          Ledige stillinger
+        </motion.h1>
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <JobCardSkeleton key={i} />
+          ))}
         </div>
       </div>
     );

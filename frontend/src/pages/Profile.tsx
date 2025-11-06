@@ -3,9 +3,13 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import LoginModal from '../components/LoginModal';
 import { profileAPI } from '../services/api';
+import { useToast } from '../components/Toast';
+import { validateName, validatePhone, validateExperience } from '../utils/validation';
+import { ProfileFormSkeleton } from '../components/Skeleton';
 
 function Profile() {
   const { isAuthenticated, setShowLoginModal, showLoginModal, logout, user, refreshUser } = useAuth();
+  const { showToast } = useToast();
   const [name, setName] = useState('');
   const [skills, setSkills] = useState<string[]>([]);
   const [newSkill, setNewSkill] = useState('');
@@ -17,7 +21,8 @@ function Profile() {
   const [cvPath, setCvPath] = useState<string | null>(null);
   const [cvUploading, setCvUploading] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [errors, setErrors] = useState<{ name?: string; phone?: string; experience?: string }>({});
 
   const addSkill = () => {
     if (newSkill && !skills.includes(newSkill)) {
@@ -37,51 +42,43 @@ function Profile() {
     // Validate file type
     const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     if (!allowedTypes.includes(file.type)) {
-      setMessage('Invalid file type. Only PDF and Word documents are allowed.');
-      setTimeout(() => setMessage(''), 3000);
+      showToast('Ugyldig filtype. Kun PDF og Word dokumenter er tillatt.', 'error');
       return;
     }
 
     // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setMessage('File is too large. Maximum size is 5MB.');
-      setTimeout(() => setMessage(''), 3000);
+      showToast('Filen er for stor. Maksimal størrelse er 5MB.', 'error');
       return;
     }
 
     setCvUploading(true);
-    setMessage('');
 
     try {
       const response = await profileAPI.uploadCV(file);
       setCvPath(response.cvPath);
-      setMessage('CV uploaded successfully!');
-      setTimeout(() => setMessage(''), 3000);
+      showToast('CV lastet opp!', 'success');
     } catch (error: any) {
       console.error('Error uploading CV:', error);
-      setMessage(error.response?.data?.error || 'Failed to upload CV');
-      setTimeout(() => setMessage(''), 5000);
+      showToast(error.response?.data?.error || 'Kunne ikke laste opp CV', 'error');
     } finally {
       setCvUploading(false);
-      // Reset file input
       e.target.value = '';
     }
   };
 
   const handleCVDelete = async () => {
-    if (!confirm('Are you sure you want to delete your CV?')) {
+    if (!confirm('Er du sikker på at du vil slette CV-en din?')) {
       return;
     }
 
     try {
       await profileAPI.deleteCV();
       setCvPath(null);
-      setMessage('CV deleted successfully!');
-      setTimeout(() => setMessage(''), 3000);
+      showToast('CV slettet!', 'success');
     } catch (error: any) {
       console.error('Error deleting CV:', error);
-      setMessage(error.response?.data?.error || 'Failed to delete CV');
-      setTimeout(() => setMessage(''), 5000);
+      showToast(error.response?.data?.error || 'Kunne ikke slette CV', 'error');
     }
   };
 
@@ -96,10 +93,10 @@ function Profile() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      showToast('CV lastet ned!', 'success');
     } catch (error: any) {
       console.error('Error downloading CV:', error);
-      setMessage(error.response?.data?.error || 'Failed to download CV');
-      setTimeout(() => setMessage(''), 5000);
+      showToast(error.response?.data?.error || 'Kunne ikke laste ned CV', 'error');
     }
   };
 
@@ -118,6 +115,7 @@ function Profile() {
   }, [user?.fullName]);
 
   const loadProfile = async () => {
+    setLoadingProfile(true);
     try {
       const profile = await profileAPI.getProfile();
       if (profile) {
@@ -132,6 +130,9 @@ function Profile() {
       }
     } catch (error) {
       console.error('Error loading profile:', error);
+      showToast('Kunne ikke laste profil', 'error');
+    } finally {
+      setLoadingProfile(false);
     }
   };
 
@@ -142,8 +143,34 @@ function Profile() {
       return;
     }
 
+    // Validate form
+    const newErrors: { name?: string; phone?: string; experience?: string } = {};
+    
+    const nameValidation = validateName(name);
+    if (!nameValidation.valid) {
+      newErrors.name = nameValidation.error;
+    }
+    
+    if (phone) {
+      const phoneValidation = validatePhone(phone);
+      if (!phoneValidation.valid) {
+        newErrors.phone = phoneValidation.error;
+      }
+    }
+    
+    const experienceValidation = validateExperience(experience);
+    if (!experienceValidation.valid) {
+      newErrors.experience = experienceValidation.error;
+    }
+    
+    setErrors(newErrors);
+    
+    if (Object.keys(newErrors).length > 0) {
+      showToast('Vennligst rett feilene i skjemaet', 'error');
+      return;
+    }
+
     setLoading(true);
-    setMessage('');
 
     try {
       await profileAPI.updateProfile({
@@ -155,14 +182,11 @@ function Profile() {
         phone,
         bio,
       });
-      setMessage('Profile saved successfully!');
-      setTimeout(() => setMessage(''), 3000);
-      // Reload user data to get updated name
-      // This will trigger the useEffect that watches user.fullName and update the name field
+      showToast('Profil lagret!', 'success');
       await refreshUser();
     } catch (error: any) {
       console.error('Error saving profile:', error);
-      setMessage(error.response?.data?.error || 'Failed to save profile');
+      showToast(error.response?.data?.error || 'Kunne ikke lagre profil', 'error');
     } finally {
       setLoading(false);
     }
@@ -172,21 +196,30 @@ function Profile() {
     return (
       <>
         <div className="max-w-4xl mx-auto text-center py-16">
-          <h1 className="text-4xl font-bold text-dark-heading mb-6">My Profile</h1>
+          <h1 className="text-4xl font-bold text-dark-heading mb-6">Min profil</h1>
           <div className="bg-mocca-100 p-12 rounded-lg shadow-md border border-mocca-200">
             <p className="text-dark-text text-lg mb-6">
-              Please sign in to access your profile
+              Vennligst logg inn for å få tilgang til profilen din
             </p>
             <button
               onClick={() => setShowLoginModal(true)}
               className="bg-mocca-400 text-white px-8 py-3 rounded-lg font-semibold hover:bg-mocca-500 transition-colors shadow-md hover:shadow-lg"
             >
-              Sign In
+              Logg inn
             </button>
           </div>
         </div>
         <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
       </>
+    );
+  }
+
+  if (loadingProfile) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-4xl font-bold text-dark-heading mb-6">Min profil</h1>
+        <ProfileFormSkeleton />
+      </div>
     );
   }
 
@@ -199,19 +232,19 @@ function Profile() {
           transition={{ duration: 0.5 }}
         >
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-4xl font-bold text-dark-heading">My Profile</h1>
+            <h1 className="text-4xl font-bold text-dark-heading">Min profil</h1>
             <button
               onClick={logout}
               className="bg-mocca-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-mocca-700 transition-colors"
             >
-              Logout
+              Logg ut
             </button>
           </div>
 
           {user && (
             <div className="mb-6 p-4 bg-champagne rounded-lg">
               <p className="text-dark-text">
-                <strong>Logged in as:</strong> {user.fullName} ({user.email})
+                <strong>Innlogget som:</strong> {user.fullName} ({user.email})
               </p>
             </div>
           )}
@@ -220,52 +253,75 @@ function Profile() {
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Basic Info */}
               <div>
-                <h2 className="text-2xl font-bold text-dark-heading mb-4">Basic Information</h2>
+                <h2 className="text-2xl font-bold text-dark-heading mb-4">Grunnleggende informasjon</h2>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-dark-text font-semibold mb-2">
-                      Full Name
+                      Fullt navn
                     </label>
                     <input
                       type="text"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text focus:outline-none focus:border-mocca-400"
-                      placeholder="Enter your full name"
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        if (errors.name) {
+                          setErrors({ ...errors, name: undefined });
+                        }
+                      }}
+                      className={`w-full px-4 py-2 rounded-lg border bg-white text-dark-text focus:outline-none ${
+                        errors.name ? 'border-red-500' : 'border-mocca-300 focus:border-mocca-400'
+                      }`}
+                      placeholder="Skriv inn ditt fulle navn"
                     />
+                    {errors.name && (
+                      <p className="text-red-600 text-sm mt-1">{errors.name}</p>
+                    )}
                   </div>
 
                   <div>
                     <label className="block text-dark-text font-semibold mb-2">
-                      Location
+                      Sted
                     </label>
                     <input
                       type="text"
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
                       className="w-full px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text focus:outline-none focus:border-mocca-400"
-                      placeholder="e.g., Oslo, Norway"
+                      placeholder="F.eks. Oslo, Norge"
                     />
                   </div>
 
                   <div>
                     <label className="block text-dark-text font-semibold mb-2">
-                      Phone
+                      Telefon
                     </label>
                     <input
                       type="tel"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="w-full px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text focus:outline-none focus:border-mocca-400"
-                      placeholder="e.g., +47 123 45 678"
+                      onChange={(e) => {
+                        setPhone(e.target.value);
+                        if (errors.phone) {
+                          setErrors({ ...errors, phone: undefined });
+                        }
+                      }}
+                      className={`w-full px-4 py-2 rounded-lg border bg-white text-dark-text focus:outline-none ${
+                        errors.phone ? 'border-red-500' : 'border-mocca-300 focus:border-mocca-400'
+                      }`}
+                      placeholder="F.eks. +47 123 45 678"
                     />
+                    {errors.phone && (
+                      <p className="text-red-600 text-sm mt-1">{errors.phone}</p>
+                    )}
+                    {!errors.phone && phone && (
+                      <p className="text-dark-secondary text-xs mt-1">Format: +47 123 45 678 eller 123 45 678</p>
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* Skills */}
               <div>
-                <h2 className="text-2xl font-bold text-dark-heading mb-4">Skills</h2>
+                <h2 className="text-2xl font-bold text-dark-heading mb-4">Ferdigheter</h2>
                 <div className="flex gap-2 mb-4">
                   <input
                     type="text"
@@ -273,14 +329,14 @@ function Profile() {
                     onChange={(e) => setNewSkill(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSkill())}
                     className="flex-1 px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text focus:outline-none focus:border-mocca-400"
-                    placeholder="Add a skill"
+                    placeholder="Legg til en ferdighet"
                   />
                   <button
                     type="button"
                     onClick={addSkill}
                     className="px-6 py-2 bg-mocca-400 text-white rounded-lg font-semibold hover:bg-mocca-500 transition-colors"
                   >
-                    Add
+                    Legg til
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -306,27 +362,39 @@ function Profile() {
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-dark-text font-semibold mb-2">
-                    Years of Experience
+                    Års erfaring
                   </label>
                   <input
                     type="number"
                     value={experience}
-                    onChange={(e) => setExperience(Number(e.target.value))}
-                    className="w-full px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text focus:outline-none focus:border-mocca-400"
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      setExperience(value);
+                      if (errors.experience) {
+                        setErrors({ ...errors, experience: undefined });
+                      }
+                    }}
+                    className={`w-full px-4 py-2 rounded-lg border bg-white text-dark-text focus:outline-none ${
+                      errors.experience ? 'border-red-500' : 'border-mocca-300 focus:border-mocca-400'
+                    }`}
                     min="0"
+                    max="50"
                   />
+                  {errors.experience && (
+                    <p className="text-red-600 text-sm mt-1">{errors.experience}</p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-dark-text font-semibold mb-2">
-                    Education
+                    Utdanning
                   </label>
                   <input
                     type="text"
                     value={education}
                     onChange={(e) => setEducation(e.target.value)}
                     className="w-full px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text focus:outline-none focus:border-mocca-400"
-                    placeholder="e.g., Bachelor in Computer Science"
+                    placeholder="F.eks. Bachelor i Informatikk"
                   />
                 </div>
               </div>
@@ -411,22 +479,12 @@ function Profile() {
                 />
               </div>
 
-            {/* Submit */}
-            {message && (
-              <div className={`p-4 rounded-lg mb-4 ${
-                message.includes('successfully') 
-                  ? 'bg-green-100 text-green-700' 
-                  : 'bg-red-100 text-red-700'
-              }`}>
-                {message}
-              </div>
-            )}
             <button
               type="submit"
               disabled={loading}
               className="w-full bg-mocca-400 text-white py-3 rounded-lg font-semibold hover:bg-mocca-500 transition-colors shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Saving...' : 'Save Profile'}
+              {loading ? 'Lagrer...' : 'Lagre profil'}
             </button>
             </form>
           </div>
