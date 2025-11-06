@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import LoginModal from './LoginModal';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -8,8 +8,8 @@ import { useTheme } from '../context/ThemeContext';
 function Layout() {
   const { showLoginModal, setShowLoginModal } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
 
   const menuItems = [
@@ -21,7 +21,19 @@ function Layout() {
   ];
 
   const isActive = (path: string) => location.pathname === path;
-  const showMenu = isMenuOpen || isHovered;
+  const showMenu = isHovered || isMenuOpen;
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (isMenuOpen && !target.closest('.relative')) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMenuOpen]);
 
   return (
     <div className="min-h-screen bg-mocca-50 dark:bg-gray-900 transition-colors duration-300">
@@ -29,33 +41,45 @@ function Layout() {
       <header className="bg-mocca-100 dark:bg-gray-800 shadow-md relative transition-colors duration-300">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex justify-between items-center">
-            {/* JobCrawl Logo with Hover Menu */}
+            {/* JobCrawl Logo with Hover/Click Menu */}
             <div 
               className="relative"
               onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
             >
-              <Link 
-                to="/" 
-                className="text-2xl font-bold text-dark-heading dark:text-gray-100 hover:text-mocca-600 dark:hover:text-mocca-400 transition-colors flex items-center gap-2"
-              >
-                JobCrawl
-                <svg
-                  className={`w-5 h-5 text-mocca-600 transition-transform duration-200 ${
-                    showMenu ? 'rotate-180' : ''
-                  }`}
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/"
+                  className="text-2xl font-bold text-dark-heading dark:text-gray-100 hover:text-mocca-600 dark:hover:text-mocca-400 transition-colors"
                 >
-                  <path d="M19 9l-7 7-7-7" />
-                </svg>
-              </Link>
+                  JobCrawl
+                </Link>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setIsMenuOpen(!isMenuOpen);
+                  }}
+                  className="text-mocca-600 hover:text-mocca-700 dark:text-mocca-400 dark:hover:text-mocca-300 transition-colors"
+                  aria-label="Toggle menu"
+                  aria-expanded={showMenu}
+                >
+                  <svg
+                    className={`w-5 h-5 transition-transform duration-200 ${
+                      showMenu ? 'rotate-180' : ''
+                    }`}
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
 
-              {/* Desktop Dropdown Menu (Hover) */}
+              {/* Dropdown Menu (Hover/Click) */}
               <AnimatePresence>
                 {showMenu && (
                   <motion.div
@@ -65,7 +89,10 @@ function Layout() {
                     transition={{ duration: 0.2 }}
                     className="absolute left-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-mocca-200 dark:border-gray-700 overflow-hidden z-50 transition-colors duration-300"
                     onMouseEnter={() => setIsHovered(true)}
-                    onMouseLeave={() => setIsHovered(false)}
+                    onMouseLeave={() => {
+                      setIsHovered(false);
+                      setIsMenuOpen(false);
+                    }}
                   >
                     {menuItems.map((item, index) => (
                       <motion.div
@@ -93,8 +120,8 @@ function Layout() {
               </AnimatePresence>
             </div>
 
-            {/* Theme Toggle and Mobile Menu */}
-            <div className="flex items-center gap-4">
+            {/* Theme Toggle */}
+            <div className="flex items-center">
               <button
                 onClick={toggleTheme}
                 className="p-2 rounded-lg hover:bg-mocca-200 dark:hover:bg-mocca-700 transition-colors"
@@ -111,64 +138,6 @@ function Layout() {
                   </svg>
                 )}
               </button>
-
-              {/* Mobile/Tablet Menu Button */}
-              <div className="md:hidden relative">
-                <button
-                  onClick={() => setIsMenuOpen(!isMenuOpen)}
-                  className="p-2 rounded-lg hover:bg-mocca-200 dark:hover:bg-mocca-700 transition-colors"
-                  aria-label="Toggle menu"
-                >
-                  <svg
-                  className="w-6 h-6 text-dark-heading dark:text-gray-100"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  {isMenuOpen ? (
-                    <path d="M6 18L18 6M6 6l12 12" />
-                  ) : (
-                    <path d="M4 6h16M4 12h16M4 18h16" />
-                  )}
-                </svg>
-              </button>
-
-              {/* Mobile Dropdown Menu */}
-              <AnimatePresence>
-                {isMenuOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
-                    className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-mocca-200 dark:border-gray-700 overflow-hidden z-50 transition-colors duration-300"
-                    onMouseLeave={() => setIsMenuOpen(false)}
-                  >
-                    {menuItems.map((item, index) => (
-                      <motion.div
-                        key={item.path}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                      >
-                        <Link
-                          to={item.path}
-                          onClick={() => setIsMenuOpen(false)}
-                          className={`block px-4 py-3 text-dark-text dark:text-gray-100 hover:bg-mocca-100 dark:hover:bg-gray-700 transition-colors font-semibold ${
-                            isActive(item.path) ? 'bg-mocca-200 dark:bg-gray-700 text-mocca-700 dark:text-mocca-300' : ''
-                          }`}
-                        >
-                          {item.label}
-                        </Link>
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              </div>
             </div>
           </nav>
         </div>
