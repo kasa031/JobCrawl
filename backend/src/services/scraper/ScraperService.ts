@@ -1,5 +1,8 @@
 import puppeteer, { Browser } from 'puppeteer';
 import { logInfo, logError, logWarn } from '../../config/logger';
+import {
+  jobListSelectors,
+} from '../../utils/selectorUtils';
 
 export interface ScrapedJob {
   title: string;
@@ -179,14 +182,7 @@ export class ScraperService {
       let foundSelector = false;
       const possibleSelectors = [
         config.selectors.jobList,
-        'article[data-testid="ad-item"]',
-        'article.ads__unit',
-        'article[class*="ads__unit"]',
-        'article',
-        '[data-testid*="ad"]',
-        '[class*="ad"]',
-        '[class*="job"]',
-        '[class*="listing"]'
+        ...jobListSelectors.filter(s => s !== config.selectors.jobList),
       ];
       
       for (const selector of possibleSelectors) {
@@ -212,25 +208,52 @@ export class ScraperService {
         (window as any).__scraperBaseUrl = baseUrl;
       }, config.baseUrl);
       
-      // Prøv flere strategier for å finne jobber
+      // Prøv flere strategier for å finne jobber med robuste fallback-selectors
       const jobs = await page.evaluate((selectors) => {
+        // Helper functions (inlined since we can't import in evaluate context)
+        const trySelectors = (element: Element | Document, selectorList: string[]): Element | null => {
+          for (const sel of selectorList) {
+            try {
+              const found = element.querySelector(sel);
+              if (found) return found;
+            } catch {}
+          }
+          return null;
+        };
+        
+        const extractText = (element: Element, selectorList: string[]): string => {
+          const found = trySelectors(element, selectorList);
+          return found?.textContent?.trim() || '';
+        };
+        
+        const extractHref = (element: Element, selectorList: string[]): string => {
+          const found = trySelectors(element, selectorList);
+          if (found instanceof HTMLAnchorElement) return found.href || '';
+          if (element instanceof HTMLAnchorElement) return element.href || '';
+          return '';
+        };
+
+        // Try to find job elements with multiple fallback selectors
         let jobElements = document.querySelectorAll(selectors.jobList);
         
-        // Hvis ingen jobber funnet med hoved-selector, prøv alternative selectors
+        // If no jobs found with main selector, try fallback selectors
         if (jobElements.length === 0) {
-          // Prøv flere vanlige selectors for jobbannonser
-          const alternativeSelectors = [
-            'article', 'div[class*="job"]', 'div[class*="ad"]', 
-            'div[class*="listing"]', '[data-testid*="job"]', 
-            'div.ads-unit', '.job-item', '.job-card'
+          const fallbackSelectors = [
+            'article[data-testid*="ad"]',
+            'article[data-testid*="job"]',
+            'article.ads__unit',
+            'article[class*="ads"]',
+            'article[class*="job"]',
+            'article',
+            'div[class*="job"]',
+            'div[class*="ad"]',
+            '[data-testid*="job"]',
+            '[data-testid*="ad"]',
           ];
           
-          for (const altSelector of alternativeSelectors) {
+          for (const altSelector of fallbackSelectors) {
             jobElements = document.querySelectorAll(altSelector);
-            if (jobElements.length > 0) {
-              // Logging happens outside evaluate context
-              break;
-            }
+            if (jobElements.length > 0) break;
           }
         }
         
@@ -238,17 +261,35 @@ export class ScraperService {
 
         jobElements.forEach((element: Element) => {
           try {
-            // Prøv flere selectors for hvert felt
-            const title = element.querySelector(selectors.title)?.textContent?.trim() || 
-                         element.querySelector('h2, h3, h4, a[href*="job"], a[href*="stilling"]')?.textContent?.trim() || '';
-            const company = element.querySelector(selectors.company)?.textContent?.trim() || '';
-            const location = element.querySelector(selectors.location)?.textContent?.trim() || '';
-            const linkElement = (element.querySelector(selectors.link) as HTMLAnchorElement) || 
-                               (element.querySelector('a[href*="job"], a[href*="stilling"]') as HTMLAnchorElement);
-            const link = linkElement?.href || '';
-            const description = element.querySelector(selectors.description || '')?.textContent?.trim() || '';
+            // Build selector arrays with primary selector first, then fallbacks
+            const titleSelectors = selectors.title 
+              ? [selectors.title, 'h1', 'h2', 'h3', 'h4', '[class*="title"]', 'a[href*="job"]']
+              : ['h1', 'h2', 'h3', 'h4', '[class*="title"]', 'a[href*="job"]'];
+            
+            const companySelectors = selectors.company
+              ? [selectors.company, '[class*="company"]', '[class*="employer"]']
+              : ['[class*="company"]', '[class*="employer"]'];
+            
+            const locationSelectors = selectors.location
+              ? [selectors.location, '[class*="location"]', '[class*="place"]']
+              : ['[class*="location"]', '[class*="place"]'];
+            
+            const linkSelectors = selectors.link
+              ? [selectors.link, 'a[href*="job"]', 'a[href*="stilling"]', 'a[href]']
+              : ['a[href*="job"]', 'a[href*="stilling"]', 'a[href]'];
+            
+            const descriptionSelectors = selectors.description
+              ? [selectors.description, '[class*="description"]', '[class*="summary"]', 'p']
+              : ['[class*="description"]', '[class*="summary"]', 'p'];
 
-            // Aksepter jobber med minst tittel og lenke (company kan være tom)
+            // Extract fields with fallback selectors
+            const title = extractText(element, titleSelectors);
+            const company = extractText(element, companySelectors);
+            const location = extractText(element, locationSelectors);
+            const link = extractHref(element, linkSelectors);
+            const description = extractText(element, descriptionSelectors);
+
+            // Accept jobs with at least title and link (company can be empty)
             if (title && link) {
               // Bygg absolutt URL hvis link er relativ
               let absoluteUrl = link;
