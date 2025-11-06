@@ -25,6 +25,7 @@ model User {
   applications  Application[]
   favorites     Favorite[]
   
+  @@index([createdAt])
   @@map("users")
 }
 
@@ -69,6 +70,11 @@ model JobListing {
   
   @@index([source])
   @@index([scrapedAt])
+  @@index([title])
+  @@index([company])
+  @@index([location])
+  @@index([publishedDate])
+  @@index([title, company]) // Composite index for deduplication
   @@map("job_listings")
 }
 
@@ -97,6 +103,9 @@ model Application {
   @@unique([userId, jobListingId])
   @@index([userId])
   @@index([status])
+  @@index([createdAt])
+  @@index([sentDate])
+  @@index([userId, status]) // Composite index for filtering by user and status
   @@map("applications")
 }
 
@@ -124,6 +133,7 @@ model Favorite {
   
   @@unique([userId, jobListingId])
   @@index([userId])
+  @@index([createdAt])
   @@map("favorites")
 }
 
