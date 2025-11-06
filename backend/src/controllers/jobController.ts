@@ -6,6 +6,7 @@ import { AdeccoScraper } from '../services/scraper/AdeccoScraper';
 import { ScrapedJob } from '../services/scraper/ScraperService';
 import { logError, logInfo } from '../config/logger';
 import { AIService } from '../services/ai/AIService';
+import { deduplicateJobs } from '../utils/deduplication';
 
 // Lazy initialization - AIService blir instantiert når den først brukes
 // Dette sikrer at dotenv.config() har kjørt først
@@ -210,38 +211,16 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
       logError('Error scraping Adecco', adeccoJobs.reason as Error);
     }
 
-    // Remove duplicates based on URL, and also by title+company combination
-    // This catches duplicates that might have slightly different URLs
-    const uniqueJobsByUrl = new Map<string, ScrapedJob>();
-    const uniqueJobsByTitleCompany = new Map<string, ScrapedJob>();
+    // Improved deduplication using fuzzy matching algorithm
+    logInfo('Deduplicating jobs', { totalBefore: allJobs.length });
+    const uniqueJobs = deduplicateJobs(allJobs);
     
-    for (const job of allJobs) {
-      // Primary deduplication: by URL
-      if (!uniqueJobsByUrl.has(job.url)) {
-        uniqueJobsByUrl.set(job.url, job);
-      }
-      
-      // Secondary deduplication: by title+company (normalized)
-      const titleCompanyKey = `${(job.title || '').toLowerCase().trim()}_${(job.company || '').toLowerCase().trim()}`;
-      if (!uniqueJobsByTitleCompany.has(titleCompanyKey)) {
-        uniqueJobsByTitleCompany.set(titleCompanyKey, job);
-      } else {
-        // If we found a duplicate by title+company, prefer the one with better URL
-        const existing = uniqueJobsByTitleCompany.get(titleCompanyKey);
-        if (existing && (job.url.length > existing.url.length || job.url.includes('http'))) {
-          uniqueJobsByTitleCompany.set(titleCompanyKey, job);
-        }
-      }
-    }
-    
-    // Combine both deduplication strategies - prefer URL-based but include title+company matches
-    const uniqueJobs = Array.from(uniqueJobsByUrl.values());
-
-    // Log how many jobs were filtered due to missing URL
-    const jobsWithUrl = allJobs.filter(job => job.url && job.url.trim());
-    const jobsWithoutUrl = allJobs.length - jobsWithUrl.length;
-    if (jobsWithoutUrl > 0) {
-      logInfo(`Filtered out ${jobsWithoutUrl} jobs without URL`, { totalScraped: allJobs.length });
+    const duplicatesRemoved = allJobs.length - uniqueJobs.length;
+    if (duplicatesRemoved > 0) {
+      logInfo(`Removed ${duplicatesRemoved} duplicate jobs`, { 
+        totalBefore: allJobs.length,
+        totalAfter: uniqueJobs.length 
+      });
     }
 
     // Save to database
