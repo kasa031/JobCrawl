@@ -7,6 +7,7 @@ import { ScrapedJob } from '../services/scraper/ScraperService';
 import { logError, logInfo } from '../config/logger';
 import { AIService } from '../services/ai/AIService';
 import { deduplicateJobs } from '../utils/deduplication';
+import { cacheService, CacheService } from '../services/cache/CacheService';
 
 // Lazy initialization - AIService blir instantiert når den først brukes
 // Dette sikrer at dotenv.config() har kjørt først
@@ -114,6 +115,21 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
                      (typeof req.query.q === 'string' ? req.query.q : undefined);
     const location = (typeof req.body?.location === 'string' ? req.body.location : undefined) ||
                      (typeof req.query.location === 'string' ? req.query.location : undefined);
+    
+    // Check cache first
+    const cacheKey = CacheService.createJobSearchKey(keywords, location);
+    const cachedResult = cacheService.get<{ totalScraped: number; saved: number; durationSeconds: number }>(cacheKey);
+    
+    if (cachedResult) {
+      logInfo('Returning cached job refresh result', { keywords, location, cacheKey });
+      return res.json({
+        message: 'Jobs refreshed successfully (from cache)',
+        ...cachedResult,
+        keywords: keywords || null,
+        location: location || null,
+        cached: true,
+      });
+    }
     
     logInfo('Starting job refresh', { keywords, location, startTime: new Date().toISOString() });
 
@@ -225,9 +241,17 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
 
     // Save to database
     let savedCount = 0;
+    let newJobsCount = 0;
     
     for (const job of uniqueJobs) {
       try {
+        // Check if job already exists
+        const existing = await prisma.jobListing.findUnique({
+          where: { url: job.url },
+        });
+        
+        const isNew = !existing;
+        
         // Use upsert - it handles both create and update automatically
         await prisma.jobListing.upsert({
           where: { url: job.url },
@@ -253,13 +277,18 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
           },
         });
         
-        // Count based on whether this was a new record (check if scrapedAt is very recent)
-        // We can't easily tell from upsert result, so we'll just count total
         savedCount++;
+        if (isNew) {
+          newJobsCount++;
+        }
       } catch (error) {
         logError('Error saving individual job', error as Error, { jobUrl: job.url, jobTitle: job.title });
       }
     }
+    
+    // Note: We don't invalidate cache here because we want to cache the result
+    // Cache will expire naturally after 20 minutes
+    // If user wants fresh data, they can wait for cache to expire or we could add a force refresh parameter
     
     logInfo('Jobs saved to database', { 
       total: uniqueJobs.length, 
@@ -267,22 +296,31 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
     });
 
     const duration = Date.now() - startTime;
+    const durationSeconds = Math.round(duration / 1000);
+    
     logInfo('Jobs refreshed', { 
       totalScraped: uniqueJobs.length, 
       saved: savedCount, 
       keywords, 
       location,
       durationMs: duration,
-      durationSeconds: Math.round(duration / 1000),
+      durationSeconds,
     });
+    
+    // Cache the result (cache for 20 minutes for job searches)
+    const result = {
+      totalScraped: uniqueJobs.length,
+      saved: savedCount,
+      durationSeconds,
+    };
+    cacheService.set(cacheKey, result, 20 * 60 * 1000); // 20 minutes TTL
     
     res.json({
       message: 'Jobs refreshed successfully',
-      totalScraped: uniqueJobs.length,
-      saved: savedCount,
+      ...result,
       keywords: keywords || null,
       location: location || null,
-      durationSeconds: Math.round(duration / 1000),
+      cached: false,
     });
   } catch (error) {
     const duration = Date.now() - startTime;
