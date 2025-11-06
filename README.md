@@ -5,11 +5,17 @@ JobCrawl er en intelligent jobbsøknadspasient designet for bachelorprosjekt. Sy
 
 ## Features
 - 🤖 **AI-powered søknadsgenerering** - Automatisk generering av tilpassede søknader
-- 🔍 **Smart web scraping** - Crawler Finn.no, Manpower, ansettelsesbyråer og flere
+- 🔍 **Smart web scraping** - Crawler fra 6 norske jobbsider (Finn.no, Manpower, Adecco, Arbeidsplassen, Karriere, og flere)
 - 👤 **Brukerprofiler** - Lagre CV, kompetanser og preferanser
-- 📊 **Jobbmatching** - Intelligent matching av relevante stillinger
+- 📊 **Jobbmatching** - Intelligent matching av relevante stillinger med AI-scoring
 - 📝 **Søknadssporing** - Oversikt over sendte søknader og status
-- 🎨 **Moderne UI** - Elegant mocca/champagne fargepalett
+- 📧 **E-postvarsler** - Få varsler når nye relevante jobber blir funnet
+- 📤 **Export** - Eksporter søknader til PDF eller Word
+- 📈 **Analytics** - Dashboard med statistikk og oversikt
+- 🎨 **Moderne UI** - Elegant mocca/champagne fargepalett med dark mode
+- ⚡ **Høy ytelse** - Caching, parallell scraping, og optimaliserte database-spørringer
+
+Se [docs/FEATURES.md](docs/FEATURES.md) for en komplett liste over alle funksjoner.
 
 ## Technology Stack
 - **Frontend**: React 18, TypeScript, Tailwind CSS
