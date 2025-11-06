@@ -1,5 +1,6 @@
 import { ScraperService, ScraperConfig, ScrapedJob } from './ScraperService';
-import { logInfo, logError } from '../../config/logger';
+import { logError } from '../../config/logger';
+import { withRetry, isRetryableError } from './RetryStrategy';
 
 /**
  * Base class for all scrapers with common functionality
@@ -86,53 +87,58 @@ export abstract class BaseScraper {
 
   /**
    * Main scraping method with error handling and retry logic
+   * Uses improved retry strategy with exponential backoff
    */
   protected async executeScrape(retries: number = 2): Promise<ScrapedJob[]> {
-    let lastError: Error | null = null;
-    
-    for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await withRetry(
+        async () => {
+          await this.scraperService.initialize();
+          const jobs = await this.scraperService.scrapeJobs(this.config);
+          
+          // Validate and sanitize jobs
+          const validJobs = jobs
+            .filter(job => this.validateJob(job))
+            .map(job => this.sanitizeJob(job))
+            .map(job => ({
+              ...job,
+              source: this.config.name.toLowerCase(),
+            }));
+          
+          // Close browser reference after successful scrape
+          await this.scraperService.close();
+          return validJobs;
+        },
+        {
+          maxRetries: retries,
+          initialDelayMs: 1000,
+          maxDelayMs: 10000,
+          backoffMultiplier: 2,
+        },
+        `${this.config.name} scraper`
+      );
+    } catch (error) {
+      // Final error handling - ensure browser is closed
       try {
-        await this.scraperService.initialize();
-        const jobs = await this.scraperService.scrapeJobs(this.config);
-        
-        // Validate and sanitize jobs
-        const validJobs = jobs
-          .filter(job => this.validateJob(job))
-          .map(job => this.sanitizeJob(job))
-          .map(job => ({
-            ...job,
-            source: this.config.name.toLowerCase(),
-          }));
-        
-        // Close browser reference after successful scrape
         await this.scraperService.close();
-        return validJobs;
-      } catch (error) {
-        lastError = error as Error;
-        logError(`Error in ${this.config.name} scraper`, error as Error, {
-          attempt: attempt + 1,
-          maxAttempts: retries + 1,
+      } catch (closeError) {
+        logError('Error closing scraper service', closeError as Error);
+      }
+      
+      // Check if error is retryable
+      if (!isRetryableError(error)) {
+        logError(`Non-retryable error in ${this.config.name} scraper`, error as Error, {
           scraperName: this.config.name,
         });
-        
-        if (attempt < retries) {
-          // Wait before retry (exponential backoff)
-          const waitTime = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s...
-          logInfo(`Retrying ${this.config.name}`, { waitTimeMs: waitTime, attempt: attempt + 1 });
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-        } else {
-          // Release browser reference on final failure
-          await this.scraperService.close();
-        }
+      } else {
+        logError(`All retries failed for ${this.config.name}`, error as Error, {
+          scraperName: this.config.name,
+          totalAttempts: retries + 1,
+        });
       }
+      
+      return [];
     }
-    
-    // All retries failed
-    logError(`All retries failed for ${this.config.name}`, lastError || new Error('Unknown error'), {
-      scraperName: this.config.name,
-      totalAttempts: retries + 1,
-    });
-    return [];
   }
 }
 
