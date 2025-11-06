@@ -1,9 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { jobsAPI } from '../services/api';
 import { useToast } from '../components/Toast';
 import { JobCardSkeleton } from '../components/Skeleton';
+import { 
+  saveSearchHistory, 
+  getSearchHistory, 
+  clearSearchHistory, 
+  removeSearchHistoryItem,
+  formatSearchHistoryItem,
+  type SearchHistoryItem 
+} from '../utils/searchHistory';
 
 interface Job {
   id: string;
@@ -37,10 +45,33 @@ function JobsList() {
   
   // Sorting
   const [sortBy, setSortBy] = useState<SortOption>('newest');
+  
+  // Search history
+  const [showHistory, setShowHistory] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
+  const historyRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadJobs();
   }, [currentPage, searchTerm, locationFilter, sourceFilter]);
+
+  useEffect(() => {
+    setSearchHistory(getSearchHistory());
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (historyRef.current && !historyRef.current.contains(event.target as Node)) {
+        setShowHistory(false);
+      }
+    };
+
+    if (showHistory) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showHistory]);
 
   const loadJobs = async () => {
     setLoading(true);
@@ -68,6 +99,12 @@ function JobsList() {
     try {
       const result = await jobsAPI.refreshJobs(searchTerm || undefined, locationFilter || undefined);
       console.log('Refresh result:', result);
+      
+      // Save to search history
+      if (searchTerm || locationFilter) {
+        saveSearchHistory(searchTerm, locationFilter);
+        setSearchHistory(getSearchHistory());
+      }
       
       if (result.saved > 0) {
         const originalSearchTerm = searchTerm;
@@ -111,7 +148,31 @@ function JobsList() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setCurrentPage(1); // Reset to first page on new search
+    setShowHistory(false);
+    
+    // Save to search history
+    if (searchTerm || locationFilter) {
+      saveSearchHistory(searchTerm, locationFilter);
+      setSearchHistory(getSearchHistory());
+    }
+    
     loadJobs();
+  };
+
+  const handleHistoryItemClick = (item: SearchHistoryItem) => {
+    setSearchTerm(item.keywords);
+    setLocationFilter(item.location);
+    setCurrentPage(1);
+    setShowHistory(false);
+    setTimeout(() => {
+      loadJobs();
+    }, 100);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setShowHistory(false);
+    }
   };
 
   const sortedJobs = [...jobs].sort((a, b) => {
@@ -174,38 +235,123 @@ function JobsList() {
       >
         <form onSubmit={handleSearch}>
           <div className="grid md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-dark-text font-semibold mb-2">
+            <div className="relative" ref={historyRef}>
+              <label htmlFor="search-input" className="block text-dark-text font-semibold mb-2">
                 Søk stillinger
               </label>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Stillingstittel, bedrift..."
-                className="w-full px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text focus:outline-none focus:border-mocca-400"
-              />
+              <div className="relative">
+                <input
+                  id="search-input"
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setShowHistory(true);
+                  }}
+                  onFocus={() => setShowHistory(true)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Stillingstittel, bedrift..."
+                  className="w-full px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text focus:outline-none focus:border-mocca-400 focus:ring-2 focus:ring-mocca-400"
+                  aria-label="Søk etter stillinger"
+                  aria-expanded={showHistory}
+                  aria-haspopup="listbox"
+                />
+                {searchHistory.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowHistory(!showHistory)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-mocca-600 hover:text-mocca-700"
+                    aria-label="Vis søkehistorikk"
+                    aria-expanded={showHistory}
+                  >
+                    {showHistory ? '▲' : '▼'}
+                  </button>
+                )}
+              </div>
+              <AnimatePresence>
+                {showHistory && searchHistory.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute z-10 w-full mt-1 bg-white border border-mocca-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                    role="listbox"
+                    aria-label="Søkehistorikk"
+                  >
+                    <div className="p-2 border-b border-mocca-200 flex justify-between items-center">
+                      <span className="text-sm font-semibold text-dark-text">Søkehistorikk</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          clearSearchHistory();
+                          setSearchHistory([]);
+                        }}
+                        className="text-xs text-mocca-600 hover:text-mocca-700"
+                        aria-label="Slett all søkehistorikk"
+                      >
+                        Slett alt
+                      </button>
+                    </div>
+                    {searchHistory.map((item) => (
+                      <button
+                        key={`${item.keywords}-${item.location}-${item.timestamp}`}
+                        type="button"
+                        onClick={() => handleHistoryItemClick(item)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleHistoryItemClick(item);
+                          }
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-mocca-100 transition-colors flex justify-between items-center group"
+                        role="option"
+                        aria-label={`Søk: ${formatSearchHistoryItem(item)}`}
+                      >
+                        <span className="text-dark-text">{formatSearchHistoryItem(item)}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeSearchHistoryItem(item.keywords, item.location);
+                            setSearchHistory(getSearchHistory());
+                          }}
+                          className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 ml-2"
+                          aria-label={`Slett søk: ${formatSearchHistoryItem(item)}`}
+                        >
+                          ✕
+                        </button>
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
             <div>
-              <label className="block text-dark-text font-semibold mb-2">
+              <label htmlFor="location-input" className="block text-dark-text font-semibold mb-2">
                 Sted
               </label>
               <input
+                id="location-input"
                 type="text"
                 value={locationFilter}
                 onChange={(e) => setLocationFilter(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="F.eks. Oslo"
-                className="w-full px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text focus:outline-none focus:border-mocca-400"
+                className="w-full px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text focus:outline-none focus:border-mocca-400 focus:ring-2 focus:ring-mocca-400"
+                aria-label="Filtrer etter sted"
               />
             </div>
             <div>
-              <label className="block text-dark-text font-semibold mb-2">
+              <label htmlFor="source-select" className="block text-dark-text font-semibold mb-2">
                 Kilde
               </label>
               <select
+                id="source-select"
                 value={sourceFilter}
                 onChange={(e) => setSourceFilter(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text focus:outline-none focus:border-mocca-400"
+                className="w-full px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text focus:outline-none focus:border-mocca-400 focus:ring-2 focus:ring-mocca-400"
+                aria-label="Filtrer etter kilde"
               >
                 <option value="">Alle kilder</option>
                 <option value="finn.no">Finn.no</option>
@@ -216,7 +362,8 @@ function JobsList() {
             <div className="flex items-end">
               <button
                 type="submit"
-                className="w-full bg-mocca-400 text-white px-6 py-2 rounded-lg font-semibold hover:bg-mocca-500 transition-colors shadow-md hover:shadow-lg"
+                className="w-full bg-mocca-400 text-white px-6 py-2 rounded-lg font-semibold hover:bg-mocca-500 transition-colors shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-mocca-400 focus:ring-offset-2"
+                aria-label="Søk i eksisterende stillinger"
               >
                 🔍 Søk i eksisterende stillinger
               </button>
@@ -231,7 +378,9 @@ function JobsList() {
           <button
             onClick={handleRefreshJobs}
             disabled={refreshing}
-            className="w-full bg-mocca-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-mocca-700 transition-colors shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-mocca-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-mocca-700 transition-colors shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-mocca-400 focus:ring-offset-2"
+            aria-label="Hent nye stillinger fra nettet"
+            aria-busy={refreshing}
           >
             {refreshing ? '⏳ Oppdaterer stillinger...' : '🔄 Hent nye stillinger fra nettet'}
           </button>
@@ -255,7 +404,8 @@ function JobsList() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text focus:outline-none focus:border-mocca-400"
+              className="px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text focus:outline-none focus:border-mocca-400 focus:ring-2 focus:ring-mocca-400"
+              aria-label="Sorter stillinger"
             >
               <option value="newest">Nyeste først</option>
               <option value="oldest">Eldste først</option>
@@ -315,7 +465,8 @@ function JobsList() {
               <div className="flex gap-2 mt-4">
                 <button
                   onClick={() => navigate(`/jobs/${job.id}`)}
-                  className="bg-mocca-400 text-white px-4 py-2 rounded-lg font-semibold hover:bg-mocca-500 transition-colors"
+                  className="bg-mocca-400 text-white px-4 py-2 rounded-lg font-semibold hover:bg-mocca-500 transition-colors focus:outline-none focus:ring-2 focus:ring-mocca-400 focus:ring-offset-2"
+                  aria-label={`Se detaljer for ${job.title} hos ${job.company}`}
                 >
                   Se detaljer
                 </button>
@@ -323,8 +474,9 @@ function JobsList() {
                   href={job.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="bg-mocca-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-mocca-700 transition-colors"
+                  className="bg-mocca-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-mocca-700 transition-colors focus:outline-none focus:ring-2 focus:ring-mocca-400 focus:ring-offset-2"
                   onClick={(e) => e.stopPropagation()}
+                  aria-label={`Åpne original stilling hos ${job.company} i ny fane`}
                 >
                   Åpne original
                 </a>
@@ -340,7 +492,9 @@ function JobsList() {
           <button
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
-            className="px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text hover:bg-mocca-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text hover:bg-mocca-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-mocca-400"
+            aria-label="Forrige side"
+            aria-disabled={currentPage === 1}
           >
             ← Forrige
           </button>
@@ -363,11 +517,13 @@ function JobsList() {
                 <button
                   key={pageNum}
                   onClick={() => handlePageChange(pageNum)}
-                  className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                  className={`px-4 py-2 rounded-lg font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-mocca-400 ${
                     currentPage === pageNum
                       ? 'bg-mocca-600 text-white'
                       : 'border border-mocca-300 bg-white text-dark-text hover:bg-mocca-100'
                   }`}
+                  aria-label={`Side ${pageNum}`}
+                  aria-current={currentPage === pageNum ? 'page' : undefined}
                 >
                   {pageNum}
                 </button>
@@ -378,7 +534,9 @@ function JobsList() {
           <button
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
-            className="px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text hover:bg-mocca-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text hover:bg-mocca-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-mocca-400"
+            aria-label="Neste side"
+            aria-disabled={currentPage === totalPages}
           >
             Neste →
           </button>
