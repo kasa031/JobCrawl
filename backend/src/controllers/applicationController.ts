@@ -224,3 +224,104 @@ export const deleteApplication = async (req: AuthRequest, res: Response): Promis
   }
 };
 
+export const bulkDeleteApplications = async (req: AuthRequest, res: Response): Promise<Response | void> => {
+  try {
+    const userId = req.userId;
+    const { ids } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'Array of application IDs is required' });
+    }
+
+    // Validate all IDs are strings
+    if (!ids.every((id: any) => typeof id === 'string')) {
+      return res.status(400).json({ error: 'All IDs must be strings' });
+    }
+
+    // Check if all applications exist and belong to user
+    const applications = await prisma.application.findMany({
+      where: {
+        id: { in: ids },
+        userId,
+      },
+    });
+
+    if (applications.length !== ids.length) {
+      return res.status(403).json({ error: 'Some applications do not exist or belong to another user' });
+    }
+
+    // Delete all applications
+    await prisma.application.deleteMany({
+      where: {
+        id: { in: ids },
+        userId,
+      },
+    });
+
+    logInfo('Bulk delete applications', { userId: req.userId, count: ids.length, applicationIds: ids });
+    res.json({ message: `${ids.length} application(s) deleted successfully`, deletedCount: ids.length });
+  } catch (error) {
+    logError('Bulk delete applications error', error as Error, { userId: req.userId, ids: req.body.ids });
+    res.status(500).json({ error: 'Failed to delete applications' });
+  }
+};
+
+export const bulkUpdateApplicationStatus = async (req: AuthRequest, res: Response): Promise<Response | void> => {
+  try {
+    const userId = req.userId;
+    const { ids, status } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'Array of application IDs is required' });
+    }
+
+    // Validate status
+    const validStatuses = ['DRAFT', 'PENDING', 'SENT', 'VIEWED', 'REJECTED', 'ACCEPTED', 'INTERVIEW', 'OFFER'];
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({ error: `Valid status is required. Must be one of: ${validStatuses.join(', ')}` });
+    }
+
+    // Validate all IDs are strings
+    if (!ids.every((id: any) => typeof id === 'string')) {
+      return res.status(400).json({ error: 'All IDs must be strings' });
+    }
+
+    // Check if all applications exist and belong to user
+    const applications = await prisma.application.findMany({
+      where: {
+        id: { in: ids },
+        userId,
+      },
+    });
+
+    if (applications.length !== ids.length) {
+      return res.status(403).json({ error: 'Some applications do not exist or belong to another user' });
+    }
+
+    // Update all applications
+    const result = await prisma.application.updateMany({
+      where: {
+        id: { in: ids },
+        userId,
+      },
+      data: {
+        status,
+      },
+    });
+
+    logInfo('Bulk update application status', { userId: req.userId, count: ids.length, status, applicationIds: ids });
+    res.json({ message: `${result.count} application(s) updated successfully`, updatedCount: result.count });
+  } catch (error) {
+    logError('Bulk update application status error', error as Error, { userId: req.userId, ids: req.body.ids, status: req.body.status });
+    res.status(500).json({ error: 'Failed to update applications' });
+  }
+};
+

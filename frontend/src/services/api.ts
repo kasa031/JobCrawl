@@ -197,6 +197,14 @@ export const applicationsAPI = {
     const response = await api.delete(`/applications/${id}`);
     return response.data;
   },
+  bulkDeleteApplications: async (ids: string[]) => {
+    const response = await api.post('/applications/bulk/delete', { ids });
+    return response.data;
+  },
+  bulkUpdateApplicationStatus: async (ids: string[], status: string) => {
+    const response = await api.post('/applications/bulk/update-status', { ids, status });
+    return response.data;
+  },
 };
 
 // Favorites API

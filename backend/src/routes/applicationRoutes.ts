@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getApplications, createApplication, updateApplication, deleteApplication } from '../controllers/applicationController';
+import { getApplications, createApplication, updateApplication, deleteApplication, bulkDeleteApplications, bulkUpdateApplicationStatus } from '../controllers/applicationController';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
@@ -11,6 +11,8 @@ router.get('/', getApplications);
 router.post('/', createApplication);
 router.put('/:id', updateApplication);
 router.delete('/:id', deleteApplication);
+router.post('/bulk/delete', bulkDeleteApplications);
+router.post('/bulk/update-status', bulkUpdateApplicationStatus);
 
 export default router;
 

@@ -63,6 +63,9 @@ function Applications() {
   const [companyFilter, setCompanyFilter] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [exportMenuOpen, setExportMenuOpen] = useState<string | null>(null);
+  const [selectedApplications, setSelectedApplications] = useState<Set<string>>(new Set());
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -72,16 +75,20 @@ function Applications() {
     }
   }, [isAuthenticated]);
 
-  // Close export menu when clicking outside
+  // Close export menu and status menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (exportMenuOpen && !(event.target as Element).closest('.relative')) {
+      const target = event.target as Element;
+      if (exportMenuOpen && !target.closest('.relative')) {
         setExportMenuOpen(null);
+      }
+      if (statusMenuOpen && !target.closest('.relative')) {
+        setStatusMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [exportMenuOpen]);
+  }, [exportMenuOpen, statusMenuOpen]);
 
   const loadApplications = async () => {
     try {
@@ -129,6 +136,63 @@ function Applications() {
       showToast('Word-dokument eksportert!', 'success');
     } catch (error: any) {
       showToast('Kunne ikke eksportere til Word', 'error');
+    }
+  };
+
+  const toggleSelectMode = () => {
+    setIsSelectMode(!isSelectMode);
+    setSelectedApplications(new Set());
+  };
+
+  const toggleApplicationSelection = (id: string) => {
+    const newSelected = new Set(selectedApplications);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedApplications(newSelected);
+  };
+
+  const selectAll = () => {
+    if (selectedApplications.size === filteredAndSortedApplications.length) {
+      setSelectedApplications(new Set());
+    } else {
+      setSelectedApplications(new Set(filteredAndSortedApplications.map(app => app.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedApplications.size === 0) return;
+
+    if (!confirm(`Er du sikker på at du vil slette ${selectedApplications.size} søknad(er)?`)) {
+      return;
+    }
+
+    try {
+      await applicationsAPI.bulkDeleteApplications(Array.from(selectedApplications));
+      showToast(`${selectedApplications.size} søknad(er) slettet!`, 'success');
+      setSelectedApplications(new Set());
+      setIsSelectMode(false);
+      await loadApplications();
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || 'Kunne ikke slette søknader';
+      showToast(errorMsg, 'error');
+    }
+  };
+
+  const handleBulkStatusUpdate = async (status: string) => {
+    if (selectedApplications.size === 0) return;
+
+    try {
+      await applicationsAPI.bulkUpdateApplicationStatus(Array.from(selectedApplications), status);
+      showToast(`${selectedApplications.size} søknad(er) oppdatert!`, 'success');
+      setSelectedApplications(new Set());
+      setIsSelectMode(false);
+      await loadApplications();
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error || 'Kunne ikke oppdatere søknader';
+      showToast(errorMsg, 'error');
     }
   };
 
@@ -244,10 +308,62 @@ function Applications() {
           </div>
         )}
 
+        {/* Bulk Actions Toolbar */}
+        {isSelectMode && selectedApplications.size > 0 && (
+          <motion.div
+            className="bg-blue-100 dark:bg-blue-900 p-4 rounded-lg shadow-md border border-blue-300 dark:border-blue-700 mb-4"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="font-semibold text-blue-800 dark:text-blue-200">
+                {selectedApplications.size} valgt
+              </span>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={handleBulkDelete}
+                  className="bg-red-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-600 transition-colors text-sm"
+                >
+                  🗑️ Slett valgte
+                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => setStatusMenuOpen(!statusMenuOpen)}
+                    className="bg-mocca-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-mocca-600 transition-colors text-sm flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-mocca-400"
+                    aria-label="Endre status"
+                    aria-expanded={statusMenuOpen}
+                  >
+                    ✏️ Endre status
+                    <svg className={`w-4 h-4 transition-transform ${statusMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {statusMenuOpen && (
+                    <div className="absolute left-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-mocca-200 dark:border-gray-700 overflow-hidden z-10 min-w-[150px]">
+                      {Object.entries(statusLabels).map(([status, label]) => (
+                        <button
+                          key={status}
+                          onClick={() => {
+                            handleBulkStatusUpdate(status);
+                            setStatusMenuOpen(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-dark-text dark:text-gray-100 hover:bg-mocca-100 dark:hover:bg-gray-700 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-mocca-400"
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Filters */}
         {applications.length > 0 && (
           <motion.div
-            className="bg-mocca-100 p-6 rounded-lg shadow-md border border-mocca-200 mb-8"
+            className="bg-mocca-100 dark:bg-gray-800 p-6 rounded-lg shadow-md border border-mocca-200 dark:border-gray-700 mb-8"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
@@ -310,9 +426,21 @@ function Applications() {
                 </select>
               </div>
             </div>
-            <p className="text-dark-secondary text-sm text-center">
-              Viser {filteredAndSortedApplications.length} av {applications.length} søknader
-            </p>
+            <div className="flex justify-between items-center flex-wrap gap-4">
+              <p className="text-dark-secondary dark:text-gray-300 text-sm">
+                Viser {filteredAndSortedApplications.length} av {applications.length} søknader
+              </p>
+              <button
+                onClick={toggleSelectMode}
+                className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${
+                  isSelectMode
+                    ? 'bg-red-500 text-white hover:bg-red-600'
+                    : 'bg-mocca-400 text-white hover:bg-mocca-500'
+                }`}
+              >
+                {isSelectMode ? '✕ Avslutt valg' : '✓ Velg flere'}
+              </button>
+            </div>
           </motion.div>
         )}
 
@@ -346,15 +474,44 @@ function Applications() {
           </div>
         ) : (
           <div className="space-y-4">
+            {isSelectMode && filteredAndSortedApplications.length > 0 && (
+              <div className="bg-mocca-100 dark:bg-gray-800 p-4 rounded-lg border border-mocca-200 dark:border-gray-700 mb-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedApplications.size === filteredAndSortedApplications.length}
+                    onChange={selectAll}
+                    className="w-5 h-5 text-mocca-600 rounded focus:ring-2 focus:ring-mocca-400"
+                  />
+                  <span className="font-semibold text-dark-text dark:text-gray-100">
+                    Velg alle ({filteredAndSortedApplications.length})
+                  </span>
+                </label>
+              </div>
+            )}
             {filteredAndSortedApplications.map((application, index) => (
               <motion.div
                 key={application.id}
-                className="bg-mocca-100 p-6 rounded-lg shadow-md border border-mocca-200 hover:shadow-lg transition-shadow"
+                className={`bg-mocca-100 dark:bg-gray-800 p-6 rounded-lg shadow-md border transition-all ${
+                  isSelectMode && selectedApplications.has(application.id)
+                    ? 'border-blue-500 dark:border-blue-400 shadow-lg ring-2 ring-blue-300 dark:ring-blue-600'
+                    : 'border-mocca-200 dark:border-gray-700 hover:shadow-lg'
+                }`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex justify-between items-start mb-4 gap-4">
+                  {isSelectMode && (
+                    <label className="cursor-pointer flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={selectedApplications.has(application.id)}
+                        onChange={() => toggleApplicationSelection(application.id)}
+                        className="w-5 h-5 text-mocca-600 rounded focus:ring-2 focus:ring-mocca-400"
+                      />
+                    </label>
+                  )}
                   <div className="flex-1">
                     <h3 className="text-2xl font-bold text-dark-heading mb-2">
                       {application.jobListing.title}
