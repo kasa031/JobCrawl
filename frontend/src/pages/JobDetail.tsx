@@ -32,6 +32,8 @@ function JobDetail() {
   const [hasApplied, setHasApplied] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [togglingFavorite, setTogglingFavorite] = useState(false);
+  const [matchScore, setMatchScore] = useState<{ score: number; explanation: string } | null>(null);
+  const [loadingMatch, setLoadingMatch] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -39,9 +41,24 @@ function JobDetail() {
       if (isAuthenticated) {
         checkIfApplied();
         checkIfFavorite();
+        loadMatchScore();
       }
     }
   }, [id, isAuthenticated]);
+
+  const loadMatchScore = async () => {
+    if (!id) return;
+    setLoadingMatch(true);
+    try {
+      const result = await aiAPI.matchJob(id);
+      setMatchScore(result);
+    } catch (error) {
+      console.error('Error loading match score:', error);
+      // Silent fail - match score is optional
+    } finally {
+      setLoadingMatch(false);
+    }
+  };
 
   const checkIfFavorite = async () => {
     if (!id) return;
@@ -217,23 +234,127 @@ function JobDetail() {
           </button>
 
           {/* Job Header */}
-          <div className="bg-mocca-100 p-8 rounded-lg shadow-md border border-mocca-200 mb-6">
+          <div className="bg-mocca-100 dark:bg-gray-800 p-8 rounded-lg shadow-md border border-mocca-200 dark:border-gray-700 mb-6 transition-colors duration-300">
             <div className="flex justify-between items-start mb-4">
               <div className="flex-1">
-                <h1 className="text-4xl font-bold text-dark-heading mb-3">
+                <h1 className="text-4xl font-bold text-dark-heading dark:text-gray-100 mb-3">
                   {job.title}
                 </h1>
-                <p className="text-dark-subheading text-2xl mb-2">
+                <p className="text-dark-subheading dark:text-gray-300 text-2xl mb-2">
                   {job.company}
                 </p>
-                <p className="text-dark-text text-lg mb-4">
+                <p className="text-dark-text dark:text-gray-300 text-lg mb-4">
                   📍 {job.location}
                 </p>
-                <span className="bg-mocca-300 text-dark-text px-3 py-1 rounded-full text-sm font-semibold">
+                <span className="bg-mocca-300 dark:bg-mocca-600 text-dark-text dark:text-gray-100 px-3 py-1 rounded-full text-sm font-semibold">
                   {job.source}
                 </span>
               </div>
             </div>
+
+            {/* AI Match Score */}
+            {isAuthenticated && (
+              <div className="mt-6 p-6 bg-white dark:bg-gray-700 rounded-lg border border-mocca-200 dark:border-gray-600">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold text-dark-heading dark:text-gray-100">
+                    AI Match Score
+                  </h3>
+                  {loadingMatch && (
+                    <div className="animate-spin text-mocca-600">⏳</div>
+                  )}
+                </div>
+                {matchScore && !loadingMatch ? (
+                  <div>
+                    {/* Score Circle */}
+                    <div className="flex items-center gap-6 mb-4">
+                      <div className="relative w-32 h-32">
+                        <svg className="transform -rotate-90 w-32 h-32">
+                          <circle
+                            cx="64"
+                            cy="64"
+                            r="56"
+                            stroke="currentColor"
+                            strokeWidth="12"
+                            fill="none"
+                            className="text-gray-200 dark:text-gray-600"
+                          />
+                          <circle
+                            cx="64"
+                            cy="64"
+                            r="56"
+                            stroke="currentColor"
+                            strokeWidth="12"
+                            fill="none"
+                            strokeDasharray={`${2 * Math.PI * 56}`}
+                            strokeDashoffset={`${2 * Math.PI * 56 * (1 - matchScore.score / 100)}`}
+                            className={`transition-all duration-1000 ${
+                              matchScore.score >= 80
+                                ? 'text-green-500'
+                                : matchScore.score >= 60
+                                ? 'text-yellow-500'
+                                : matchScore.score >= 40
+                                ? 'text-orange-500'
+                                : 'text-red-500'
+                            }`}
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="text-center">
+                            <div className={`text-3xl font-bold ${
+                              matchScore.score >= 80
+                                ? 'text-green-500'
+                                : matchScore.score >= 60
+                                ? 'text-yellow-500'
+                                : matchScore.score >= 40
+                                ? 'text-orange-500'
+                                : 'text-red-500'
+                            }`}>
+                              {matchScore.score}
+                            </div>
+                            <div className="text-xs text-dark-secondary dark:text-gray-400">/ 100</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Explanation */}
+                    <div className="bg-mocca-50 dark:bg-gray-800 p-4 rounded-lg">
+                      <p className="text-dark-text dark:text-gray-300 leading-relaxed">
+                        {matchScore.explanation}
+                      </p>
+                    </div>
+
+                    {/* Match Level Badge */}
+                    <div className="mt-4 flex items-center gap-2">
+                      <span className={`px-4 py-2 rounded-full text-sm font-semibold ${
+                        matchScore.score >= 80
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                          : matchScore.score >= 60
+                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                          : matchScore.score >= 40
+                          ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                      }`}>
+                        {matchScore.score >= 80
+                          ? '🌟 Utmerket match'
+                          : matchScore.score >= 60
+                          ? '✅ God match'
+                          : matchScore.score >= 40
+                          ? '⚠️ Moderat match'
+                          : '❌ Lav match'}
+                      </span>
+                    </div>
+                  </div>
+                ) : !loadingMatch && (
+                  <button
+                    onClick={loadMatchScore}
+                    className="w-full bg-mocca-400 text-white px-6 py-3 rounded-lg font-semibold hover:bg-mocca-500 transition-colors"
+                  >
+                    Beregn match score
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex gap-4 mt-6 flex-wrap">
@@ -291,26 +412,26 @@ function JobDetail() {
           </div>
 
           {/* Job Description */}
-          <div className="bg-mocca-100 p-8 rounded-lg shadow-md border border-mocca-200 mb-6">
-            <h2 className="text-2xl font-bold text-dark-heading mb-4">
+          <div className="bg-mocca-100 dark:bg-gray-800 p-8 rounded-lg shadow-md border border-mocca-200 dark:border-gray-700 mb-6 transition-colors duration-300">
+            <h2 className="text-2xl font-bold text-dark-heading dark:text-gray-100 mb-4">
               Stillingsbeskrivelse
             </h2>
-            <div className="prose max-w-none text-dark-text whitespace-pre-wrap">
+            <div className="prose max-w-none text-dark-text dark:text-gray-300 whitespace-pre-wrap">
               {job.description}
             </div>
           </div>
 
           {/* Requirements */}
           {job.requirements && job.requirements.length > 0 && (
-            <div className="bg-mocca-100 p-8 rounded-lg shadow-md border border-mocca-200 mb-6">
-              <h2 className="text-2xl font-bold text-dark-heading mb-4">
+            <div className="bg-mocca-100 dark:bg-gray-800 p-8 rounded-lg shadow-md border border-mocca-200 dark:border-gray-700 mb-6 transition-colors duration-300">
+              <h2 className="text-2xl font-bold text-dark-heading dark:text-gray-100 mb-4">
                 Krav
               </h2>
               <div className="flex flex-wrap gap-2">
                 {job.requirements.map((req, i) => (
                   <span
                     key={i}
-                    className="bg-mocca-200 text-dark-text px-4 py-2 rounded-lg text-sm font-medium"
+                    className="bg-mocca-200 dark:bg-gray-700 text-dark-text dark:text-gray-200 px-4 py-2 rounded-lg text-sm font-medium"
                   >
                     {req}
                   </span>
@@ -320,23 +441,23 @@ function JobDetail() {
           )}
 
           {/* Job Metadata */}
-          <div className="bg-champagne p-6 rounded-lg border border-mocca-200">
+          <div className="bg-champagne dark:bg-gray-700 p-6 rounded-lg border border-mocca-200 dark:border-gray-600 transition-colors duration-300">
             <div className="grid md:grid-cols-2 gap-4 text-sm">
               <div>
-                <strong className="text-dark-heading">Kilde:</strong>{' '}
-                <span className="text-dark-text">{job.source}</span>
+                <strong className="text-dark-heading dark:text-gray-100">Kilde:</strong>{' '}
+                <span className="text-dark-text dark:text-gray-300">{job.source}</span>
               </div>
               {job.publishedDate && (
                 <div>
-                  <strong className="text-dark-heading">Publisert:</strong>{' '}
-                  <span className="text-dark-text">
+                  <strong className="text-dark-heading dark:text-gray-100">Publisert:</strong>{' '}
+                  <span className="text-dark-text dark:text-gray-300">
                     {new Date(job.publishedDate).toLocaleDateString('no-NO')}
                   </span>
                 </div>
               )}
               <div>
-                <strong className="text-dark-heading">Hentet:</strong>{' '}
-                <span className="text-dark-text">
+                <strong className="text-dark-heading dark:text-gray-100">Hentet:</strong>{' '}
+                <span className="text-dark-text dark:text-gray-300">
                   {new Date(job.scrapedAt).toLocaleDateString('no-NO')}
                 </span>
               </div>
