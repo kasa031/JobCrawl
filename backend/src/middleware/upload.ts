@@ -22,18 +22,26 @@ const storage = multer.diskStorage({
   },
 });
 
-// File filter - only allow PDF and Word documents
+// File filter - allow PDF, Word, ODT, RTF, and plain text
 const fileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const allowedMimes = [
     'application/pdf',
-    'application/msword',
+    'application/msword', // .doc
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+    'application/vnd.oasis.opendocument.text', // .odt
+    'application/rtf', // .rtf
+    'text/rtf', // .rtf (alternative MIME type)
+    'text/plain', // .txt
   ];
 
-  if (allowedMimes.includes(file.mimetype)) {
+  // Also check file extension as fallback (some systems may not set MIME type correctly)
+  const allowedExtensions = ['.pdf', '.doc', '.docx', '.odt', '.rtf', '.txt'];
+  const fileExtension = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
+
+  if (allowedMimes.includes(file.mimetype) || allowedExtensions.includes(fileExtension)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only PDF and Word documents are allowed.'));
+    cb(new Error(`Invalid file type. Allowed formats: PDF, DOC, DOCX, ODT, RTF, TXT. Received: ${file.mimetype || 'unknown'}`));
   }
 };
 
