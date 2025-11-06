@@ -9,6 +9,7 @@ import authRoutes from './routes/authRoutes';
 import profileRoutes from './routes/profileRoutes';
 import applicationRoutes from './routes/applicationRoutes';
 import favoriteRoutes from './routes/favoriteRoutes';
+import analyticsRoutes from './routes/analyticsRoutes';
 import { rateLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
 import { logInfo, logError } from './config/logger';
@@ -67,6 +68,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/favorites', favoriteRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Error handler middleware (must be last)
 app.use(errorHandler);

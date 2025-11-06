@@ -207,6 +207,14 @@ export const applicationsAPI = {
   },
 };
 
+// Analytics API
+export const analyticsAPI = {
+  getAnalytics: async () => {
+    const response = await api.get('/analytics');
+    return response.data;
+  },
+};
+
 // Favorites API
 export const favoritesAPI = {
   getFavorites: async () => {
