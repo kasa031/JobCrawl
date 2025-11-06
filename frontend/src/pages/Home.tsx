@@ -1,5 +1,8 @@
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import jobsearch from '../assets/images/jobsearch.png';
+import ineedajob from '../assets/images/ineedajob.png';
+import office from '../assets/images/office.png';
 
 function Home() {
   const { isAuthenticated, setShowLoginModal } = useAuth();
@@ -14,13 +17,25 @@ function Home() {
     <div className="max-w-6xl mx-auto">
       {/* Hero Section */}
       <section className="text-center py-16">
+        <motion.div
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.6 }}
+          className="mb-6"
+        >
+          <img 
+            src={jobsearch} 
+            alt="Job search illustration" 
+            className="w-32 h-32 mx-auto mb-4 object-contain"
+          />
+        </motion.div>
         <motion.h1 
           className="text-5xl font-extrabold text-dark-heading mb-6"
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.6 }}
         >
-          Welcome to JobCrawl
+          Velkommen til JobCrawl
         </motion.h1>
         <motion.p 
           className="text-xl text-dark-subheading mb-8 max-w-2xl mx-auto"
@@ -28,8 +43,8 @@ function Home() {
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.2, duration: 0.6 }}
         >
-          Your intelligent job application assistant. 
-          We find relevant positions and help you create personalized applications.
+          Din intelligente jobbsøknadsassistent. 
+          Vi finner relevante stillinger og hjelper deg med å lage personlige søknader.
         </motion.p>
       </section>
 
@@ -61,12 +76,18 @@ function Home() {
               ✓ Available
             </div>
           )}
-          <div className="text-4xl mb-4">🤖</div>
+          <div className="mb-4 flex justify-center">
+            <img 
+              src={ineedajob} 
+              alt="AI job search" 
+              className="w-16 h-16 object-contain"
+            />
+          </div>
           <h3 className="text-2xl font-bold text-dark-heading mb-3">
-            AI-Powered Applications
+            AI-drevne søknader
           </h3>
           <p className="text-dark-text">
-            Generate personalized cover letters and applications tailored to each job posting.
+            Generer personlige søknadsbrev og søknader tilpasset hver stilling.
           </p>
         </motion.div>
 
@@ -91,12 +112,18 @@ function Home() {
               ✓ Available
             </div>
           )}
-          <div className="text-4xl mb-4">🔍</div>
+          <div className="mb-4 flex justify-center">
+            <img 
+              src={jobsearch} 
+              alt="Smart job search" 
+              className="w-16 h-16 object-contain"
+            />
+          </div>
           <h3 className="text-2xl font-bold text-dark-heading mb-3">
-            Smart Job Discovery
+            Smart jobbsøk
           </h3>
           <p className="text-dark-text">
-            Automatically crawl Finn.no, Manpower, and other Norwegian job sites.
+            Automatisk søk på Finn.no, Manpower og andre norske jobbsider.
           </p>
         </motion.div>
 
@@ -121,12 +148,18 @@ function Home() {
               ✓ Available
             </div>
           )}
-          <div className="text-4xl mb-4">📊</div>
+          <div className="mb-4 flex justify-center">
+            <img 
+              src={office} 
+              alt="Office and applications" 
+              className="w-16 h-16 object-contain"
+            />
+          </div>
           <h3 className="text-2xl font-bold text-dark-heading mb-3">
-            Track Applications
+            Følg søknader
           </h3>
           <p className="text-dark-text">
-            Keep track of your applications and their statuses in one place.
+            Hold oversikt over søknadene dine og deres status på ett sted.
           </p>
         </motion.div>
       </motion.section>

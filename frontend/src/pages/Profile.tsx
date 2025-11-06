@@ -6,6 +6,7 @@ import { profileAPI } from '../services/api';
 import { useToast } from '../components/Toast';
 import { validateName, validatePhone, validateExperience } from '../utils/validation';
 import { ProfileFormSkeleton } from '../components/Skeleton';
+import exitIcon from '../assets/images/exit.png';
 
 function Profile() {
   const { isAuthenticated, setShowLoginModal, showLoginModal, logout, user, refreshUser } = useAuth();
@@ -235,8 +236,10 @@ function Profile() {
             <h1 className="text-4xl font-bold text-dark-heading">Min profil</h1>
             <button
               onClick={logout}
-              className="bg-mocca-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-mocca-700 transition-colors"
+              className="bg-mocca-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-mocca-700 transition-colors flex items-center gap-2"
+              aria-label="Logg ut"
             >
+              <img src={exitIcon} alt="Logout" className="w-5 h-5" />
               Logg ut
             </button>
           </div>

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../services/api';
+import envelopeIcon from '../assets/images/envolope.png';
+import orangeMailIcon from '../assets/images/orangemailicon.png';
 
 function VerifyEmail() {
   const [searchParams] = useSearchParams();
@@ -51,8 +53,12 @@ function VerifyEmail() {
         }`}
       >
         <div className="text-center mb-6">
-          <div className="text-6xl mb-4">
-            {status === 'success' ? '✅' : '❌'}
+          <div className="mb-4 flex justify-center">
+            <img 
+              src={status === 'success' ? orangeMailIcon : envelopeIcon} 
+              alt={status === 'success' ? 'Email verified' : 'Email verification'} 
+              className="w-24 h-24 object-contain"
+            />
           </div>
           <h1 className="text-3xl font-bold text-dark-heading mb-4">
             {status === 'success' ? 'Registrering fullført!' : 'Verifisering feilet'}

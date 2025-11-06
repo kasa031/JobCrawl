@@ -5,6 +5,7 @@ import { applicationsAPI } from '../services/api';
 import LoginModal from '../components/LoginModal';
 import { useToast } from '../components/Toast';
 import { Skeleton } from '../components/Skeleton';
+import jobOfferMail from '../assets/images/joboffermail.png';
 
 interface Application {
   id: string;
@@ -191,13 +192,20 @@ function Applications() {
   return (
     <>
       <div className="max-w-6xl mx-auto">
-        <motion.h1
-          className="text-4xl font-bold text-dark-heading mb-6"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          Mine søknader
-        </motion.h1>
+        <div className="flex items-center gap-4 mb-6">
+          <img 
+            src={jobOfferMail} 
+            alt="Job applications" 
+            className="w-12 h-12 object-contain"
+          />
+          <motion.h1
+            className="text-4xl font-bold text-dark-heading"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            Mine søknader
+          </motion.h1>
+        </div>
 
         {error && (
           <div className="bg-red-100 text-red-700 p-4 rounded-lg mb-6">
