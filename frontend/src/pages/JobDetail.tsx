@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { jobsAPI, applicationsAPI, aiAPI } from '../services/api';
 import LoginModal from '../components/LoginModal';
+import { useToast } from '../components/Toast';
+import { Skeleton } from '../components/Skeleton';
 
 interface Job {
   id: string;
@@ -22,6 +24,7 @@ function JobDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isAuthenticated, showLoginModal, setShowLoginModal, user } = useAuth();
+  const { showToast } = useToast();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
@@ -45,7 +48,9 @@ function JobDetail() {
       setError('');
     } catch (err: any) {
       console.error('Error loading job:', err);
-      setError(err.response?.data?.error || 'Failed to load job');
+      const errorMsg = err.response?.data?.error || 'Kunne ikke laste stilling';
+      setError(errorMsg);
+      showToast(errorMsg, 'error');
     } finally {
       setLoading(false);
     }
@@ -70,7 +75,7 @@ function JobDetail() {
     }
 
     if (!user?.id || !job) {
-      alert('Unable to apply. Please try again.');
+      showToast('Kunne ikke søke. Prøv igjen.', 'error');
       return;
     }
 
@@ -78,6 +83,8 @@ function JobDetail() {
     setError('');
 
     try {
+      showToast('Genererer søknadsbrev med AI...', 'info');
+      
       // Generate cover letter
       const letterResponse = await aiAPI.generateCoverLetter(job.id);
       const coverLetter = letterResponse.coverLetter;
@@ -90,12 +97,15 @@ function JobDetail() {
       });
 
       setHasApplied(true);
-      alert('Application created successfully! You can view it in the Applications page.');
-      navigate('/applications');
+      showToast('Søknad opprettet! Du kan se den i Mine søknader.', 'success');
+      setTimeout(() => {
+        navigate('/applications');
+      }, 1500);
     } catch (err: any) {
       console.error('Error applying:', err);
-      setError(err.response?.data?.error || 'Failed to create application');
-      alert(err.response?.data?.error || 'Failed to create application');
+      const errorMsg = err.response?.data?.error || 'Kunne ikke opprette søknad';
+      setError(errorMsg);
+      showToast(errorMsg, 'error');
     } finally {
       setApplying(false);
     }
@@ -103,9 +113,20 @@ function JobDetail() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto text-center py-16">
-        <div className="animate-spin text-4xl mb-4">⏳</div>
-        <p className="text-dark-text">Loading job details...</p>
+      <div className="max-w-4xl mx-auto">
+        <Skeleton variant="rectangular" width={100} height={40} className="mb-6 rounded-lg" />
+        <div className="bg-mocca-100 p-8 rounded-lg shadow-md border border-mocca-200 mb-6">
+          <Skeleton variant="text" width="70%" height={40} className="mb-4" />
+          <Skeleton variant="text" width="50%" height={28} className="mb-2" />
+          <Skeleton variant="text" width="40%" height={24} className="mb-4" />
+          <Skeleton variant="rectangular" width={200} height={48} className="rounded-lg" />
+        </div>
+        <div className="bg-mocca-100 p-8 rounded-lg shadow-md border border-mocca-200">
+          <Skeleton variant="text" width="40%" height={32} className="mb-4" />
+          <Skeleton variant="text" width="100%" height={16} className="mb-2" />
+          <Skeleton variant="text" width="95%" height={16} className="mb-2" />
+          <Skeleton variant="text" width="90%" height={16} />
+        </div>
       </div>
     );
   }
@@ -119,7 +140,7 @@ function JobDetail() {
             onClick={() => navigate('/jobs')}
             className="mt-4 bg-mocca-400 text-white px-6 py-2 rounded-lg font-semibold hover:bg-mocca-500 transition-colors"
           >
-            Back to Jobs
+            Tilbake til stillinger
           </button>
         </div>
       </div>
@@ -130,12 +151,12 @@ function JobDetail() {
     return (
       <div className="max-w-4xl mx-auto py-16">
         <div className="text-center">
-          <p className="text-dark-text text-lg mb-4">Job not found</p>
+          <p className="text-dark-text text-lg mb-4">Stilling ikke funnet</p>
           <button
             onClick={() => navigate('/jobs')}
             className="bg-mocca-400 text-white px-6 py-2 rounded-lg font-semibold hover:bg-mocca-500 transition-colors"
           >
-            Back to Jobs
+            Tilbake til stillinger
           </button>
         </div>
       </div>
@@ -155,7 +176,7 @@ function JobDetail() {
             onClick={() => navigate('/jobs')}
             className="mb-6 text-mocca-600 hover:text-mocca-700 font-semibold flex items-center gap-2"
           >
-            ← Back to Jobs
+            ← Tilbake til stillinger
           </button>
 
           {/* Job Header */}
@@ -185,14 +206,14 @@ function JobDetail() {
                 rel="noopener noreferrer"
                 className="bg-mocca-400 text-white px-6 py-3 rounded-lg font-semibold hover:bg-mocca-500 transition-colors shadow-md hover:shadow-lg"
               >
-                View on Source Website
+                Se på original nettsted
               </a>
               {hasApplied ? (
                 <Link
                   to="/applications"
                   className="bg-green-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors shadow-md hover:shadow-lg"
                 >
-                  View Application
+                  Se søknad
                 </Link>
               ) : (
                 <button
@@ -200,7 +221,7 @@ function JobDetail() {
                   disabled={applying || !isAuthenticated}
                   className="bg-mocca-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-mocca-700 transition-colors shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {applying ? 'Applying...' : 'Apply with AI Cover Letter'}
+                  {applying ? 'Søker...' : 'Søk med AI-generert søknadsbrev'}
                 </button>
               )}
             </div>
@@ -215,7 +236,7 @@ function JobDetail() {
           {/* Job Description */}
           <div className="bg-mocca-100 p-8 rounded-lg shadow-md border border-mocca-200 mb-6">
             <h2 className="text-2xl font-bold text-dark-heading mb-4">
-              Job Description
+              Stillingsbeskrivelse
             </h2>
             <div className="prose max-w-none text-dark-text whitespace-pre-wrap">
               {job.description}
@@ -226,7 +247,7 @@ function JobDetail() {
           {job.requirements && job.requirements.length > 0 && (
             <div className="bg-mocca-100 p-8 rounded-lg shadow-md border border-mocca-200 mb-6">
               <h2 className="text-2xl font-bold text-dark-heading mb-4">
-                Requirements
+                Krav
               </h2>
               <div className="flex flex-wrap gap-2">
                 {job.requirements.map((req, i) => (
@@ -245,21 +266,21 @@ function JobDetail() {
           <div className="bg-champagne p-6 rounded-lg border border-mocca-200">
             <div className="grid md:grid-cols-2 gap-4 text-sm">
               <div>
-                <strong className="text-dark-heading">Source:</strong>{' '}
+                <strong className="text-dark-heading">Kilde:</strong>{' '}
                 <span className="text-dark-text">{job.source}</span>
               </div>
               {job.publishedDate && (
                 <div>
-                  <strong className="text-dark-heading">Published:</strong>{' '}
+                  <strong className="text-dark-heading">Publisert:</strong>{' '}
                   <span className="text-dark-text">
-                    {new Date(job.publishedDate).toLocaleDateString()}
+                    {new Date(job.publishedDate).toLocaleDateString('no-NO')}
                   </span>
                 </div>
               )}
               <div>
-                <strong className="text-dark-heading">Scraped:</strong>{' '}
+                <strong className="text-dark-heading">Hentet:</strong>{' '}
                 <span className="text-dark-text">
-                  {new Date(job.scrapedAt).toLocaleDateString()}
+                  {new Date(job.scrapedAt).toLocaleDateString('no-NO')}
                 </span>
               </div>
             </div>
