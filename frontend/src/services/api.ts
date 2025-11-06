@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { checkRateLimit } from '../utils/rateLimiter';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
@@ -9,18 +10,41 @@ const api = axios.create({
   },
 });
 
-// Add token to requests if available
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// Add token to requests if available and check rate limiting
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    // Don't set Content-Type for FormData - axios will set it with boundary
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
+
+    // Check rate limiting
+    const endpoint = config.url || '';
+    const userId = token ? JSON.parse(atob(token.split('.')[1])).userId : undefined;
+    const rateLimitCheck = checkRateLimit(endpoint, userId);
+
+    if (!rateLimitCheck.isAllowed) {
+      // Reject the request with a rate limit error
+      return Promise.reject({
+        response: {
+          data: { error: rateLimitCheck.error || 'For mange forespørsler' },
+          status: 429,
+          statusText: 'Too Many Requests',
+        },
+        isAxiosError: true,
+      });
+    }
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
-  // Don't set Content-Type for FormData - axios will set it with boundary
-  if (config.data instanceof FormData) {
-    delete config.headers['Content-Type'];
-  }
-  return config;
-});
+);
 
 // Response interceptor for better error handling
 api.interceptors.response.use(
@@ -50,6 +74,11 @@ api.interceptors.response.use(
       if (!window.location.pathname.includes('/verify-email')) {
         window.location.href = '/';
       }
+    }
+
+    // Handle 429 Too Many Requests (rate limiting)
+    if (error.response?.status === 429) {
+      console.warn('Rate limited:', error.response.data);
     }
 
     // Handle 500 errors
