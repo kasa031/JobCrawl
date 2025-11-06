@@ -6,8 +6,9 @@ import LoginModal from '../components/LoginModal';
 import { useToast } from '../components/Toast';
 import { Skeleton } from '../components/Skeleton';
 import jobOfferMail from '../assets/images/joboffermail.png';
+import { exportToPDF, exportToWord } from '../utils/exportUtils';
 
-interface Application {
+export interface Application {
   id: string;
   status: string;
   coverLetter: string | null;
@@ -50,7 +51,7 @@ const statusLabels: Record<string, string> = {
 type SortOption = 'newest' | 'oldest' | 'company' | 'status';
 
 function Applications() {
-  const { isAuthenticated, showLoginModal, setShowLoginModal } = useAuth();
+  const { isAuthenticated, showLoginModal, setShowLoginModal, user } = useAuth();
   const { showToast } = useToast();
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +62,7 @@ function Applications() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [companyFilter, setCompanyFilter] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [exportMenuOpen, setExportMenuOpen] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -69,6 +71,17 @@ function Applications() {
       setLoading(false);
     }
   }, [isAuthenticated]);
+
+  // Close export menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuOpen && !(event.target as Element).closest('.relative')) {
+        setExportMenuOpen(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [exportMenuOpen]);
 
   const loadApplications = async () => {
     try {
@@ -98,6 +111,24 @@ function Applications() {
     } catch (err: any) {
       const errorMsg = err.response?.data?.error || 'Kunne ikke slette søknad';
       showToast(errorMsg, 'error');
+    }
+  };
+
+  const handleExportPDF = async (application: Application) => {
+    try {
+      await exportToPDF(application, user?.fullName);
+      showToast('PDF eksportert!', 'success');
+    } catch (error: any) {
+      showToast('Kunne ikke eksportere til PDF', 'error');
+    }
+  };
+
+  const handleExportWord = async (application: Application) => {
+    try {
+      await exportToWord(application, user?.fullName);
+      showToast('Word-dokument eksportert!', 'success');
+    } catch (error: any) {
+      showToast('Kunne ikke eksportere til Word', 'error');
     }
   };
 
@@ -349,7 +380,7 @@ function Applications() {
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <a
                       href={application.jobListing.url}
                       target="_blank"
@@ -358,6 +389,41 @@ function Applications() {
                     >
                       Se stilling
                     </a>
+                    <div className="relative">
+                      <button
+                        onClick={() => setExportMenuOpen(exportMenuOpen === application.id ? null : application.id)}
+                        className="bg-blue-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-600 transition-colors text-sm flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        aria-label="Eksporter søknad"
+                        aria-expanded={exportMenuOpen === application.id}
+                      >
+                        📥 Eksporter
+                        <svg className={`w-4 h-4 transition-transform ${exportMenuOpen === application.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {exportMenuOpen === application.id && (
+                        <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-mocca-200 dark:border-gray-700 overflow-hidden z-10 min-w-[150px]">
+                          <button
+                            onClick={() => {
+                              handleExportPDF(application);
+                              setExportMenuOpen(null);
+                            }}
+                            className="w-full text-left px-4 py-2 text-dark-text dark:text-gray-100 hover:bg-mocca-100 dark:hover:bg-gray-700 transition-colors text-sm flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-mocca-400"
+                          >
+                            📄 PDF
+                          </button>
+                          <button
+                            onClick={() => {
+                              handleExportWord(application);
+                              setExportMenuOpen(null);
+                            }}
+                            className="w-full text-left px-4 py-2 text-dark-text dark:text-gray-100 hover:bg-mocca-100 dark:hover:bg-gray-700 transition-colors text-sm flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-mocca-400"
+                          >
+                            📝 Word
+                          </button>
+                        </div>
+                      )}
+                    </div>
                     <button
                       onClick={() => handleDelete(application.id)}
                       className="bg-red-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-600 transition-colors text-sm"
