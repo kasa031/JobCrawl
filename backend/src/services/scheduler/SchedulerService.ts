@@ -2,6 +2,7 @@ import { logInfo, logError } from '../../config/logger';
 import { FinnNoScraper } from '../scraper/FinnNoScraper';
 import { ManpowerScraper } from '../scraper/ManpowerScraper';
 import { AdeccoScraper } from '../scraper/AdeccoScraper';
+import { ArbeidsplassenScraper } from '../scraper/ArbeidsplassenScraper';
 import { deduplicateJobs } from '../../utils/deduplication';
 import prisma from '../../config/database';
 import { ScrapedJob } from '../scraper/ScraperService';
@@ -76,14 +77,16 @@ class SchedulerService {
       const finnScraper = new FinnNoScraper();
       const manpowerScraper = new ManpowerScraper();
       const adeccoScraper = new AdeccoScraper();
+      const arbeidsplassenScraper = new ArbeidsplassenScraper();
 
       const allJobs: ScrapedJob[] = [];
 
       // Scrape from all sources in parallel
-      const [finnJobs, manpowerJobs, adeccoJobs] = await Promise.allSettled([
+      const [finnJobs, manpowerJobs, adeccoJobs, arbeidsplassenJobs] = await Promise.allSettled([
         finnScraper.scrapeWithFilters(keywords, location),
         manpowerScraper.scrapeWithFilters(keywords, location),
         adeccoScraper.scrapeWithFilters(keywords, location),
+        arbeidsplassenScraper.scrapeWithFilters(keywords, location),
       ]);
 
       // Handle Finn.no results
@@ -111,6 +114,15 @@ class SchedulerService {
         allJobs.push(...jobsWithSource);
       } else {
         logError('Error scraping Adecco in scheduled job', adeccoJobs.reason as Error);
+      }
+
+      // Handle Arbeidsplassen results
+      if (arbeidsplassenJobs.status === 'fulfilled') {
+        logInfo(`Arbeidsplassen scraped ${arbeidsplassenJobs.value.length} jobs`);
+        const jobsWithSource = arbeidsplassenJobs.value.map((job) => ({ ...job, source: 'arbeidsplassen' }));
+        allJobs.push(...jobsWithSource);
+      } else {
+        logError('Error scraping Arbeidsplassen in scheduled job', arbeidsplassenJobs.reason as Error);
       }
 
       // Deduplicate jobs
