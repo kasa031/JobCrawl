@@ -10,6 +10,7 @@ import profileRoutes from './routes/profileRoutes';
 import applicationRoutes from './routes/applicationRoutes';
 import favoriteRoutes from './routes/favoriteRoutes';
 import analyticsRoutes from './routes/analyticsRoutes';
+import schedulerRoutes from './routes/schedulerRoutes';
 import { rateLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
 import { logInfo, logError } from './config/logger';
@@ -69,6 +70,7 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/favorites', favoriteRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/scheduler', schedulerRoutes);
 
 // Error handler middleware (must be last)
 app.use(errorHandler);
@@ -91,6 +93,32 @@ const server = app.listen(PORT, () => {
   });
 });
 
+// Initialize scheduled scraping (if enabled via environment variable)
+const initializeScheduledScraping = async () => {
+  const SCHEDULED_SCRAPING_ENABLED = process.env.SCHEDULED_SCRAPING_ENABLED === 'true';
+  const SCHEDULED_SCRAPING_INTERVAL_HOURS = parseInt(process.env.SCHEDULED_SCRAPING_INTERVAL_HOURS || '6', 10);
+  const SCHEDULED_SCRAPING_KEYWORDS = process.env.SCHEDULED_SCRAPING_KEYWORDS;
+  const SCHEDULED_SCRAPING_LOCATION = process.env.SCHEDULED_SCRAPING_LOCATION;
+
+  if (SCHEDULED_SCRAPING_ENABLED) {
+    const { schedulerService } = await import('./services/scheduler/SchedulerService');
+    const intervalMs = SCHEDULED_SCRAPING_INTERVAL_HOURS * 60 * 60 * 1000;
+    schedulerService.startScheduledScraping(intervalMs, SCHEDULED_SCRAPING_KEYWORDS, SCHEDULED_SCRAPING_LOCATION);
+    logInfo('Scheduled scraping enabled', {
+      intervalHours: SCHEDULED_SCRAPING_INTERVAL_HOURS,
+      keywords: SCHEDULED_SCRAPING_KEYWORDS,
+      location: SCHEDULED_SCRAPING_LOCATION,
+    });
+  } else {
+    logInfo('Scheduled scraping disabled', {});
+  }
+};
+
+// Initialize scheduled scraping asynchronously
+initializeScheduledScraping().catch((error) => {
+  logError('Error initializing scheduled scraping', error as Error);
+});
+
 // Graceful shutdown - close browser when app shuts down
 const gracefulShutdown = async (signal: string) => {
   logInfo(`${signal} received, shutting down gracefully`);
@@ -98,6 +126,14 @@ const gracefulShutdown = async (signal: string) => {
     // Import BrowserManager dynamically to avoid circular dependencies
     const { BrowserManager } = await import('./services/scraper/ScraperService');
     await BrowserManager.forceClose();
+    
+    // Stop scheduled scraping
+    try {
+      const { schedulerService } = await import('./services/scheduler/SchedulerService');
+      schedulerService.stopScheduledScraping();
+    } catch (error) {
+      // Ignore if scheduler not initialized
+    }
   } catch (error) {
     logError('Error during browser cleanup', error as Error);
   }
