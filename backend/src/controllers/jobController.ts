@@ -9,6 +9,7 @@ import { logError, logInfo } from '../config/logger';
 import { AIService } from '../services/ai/AIService';
 import { deduplicateJobs } from '../utils/deduplication';
 import { cacheService, CacheService } from '../services/cache/CacheService';
+import { jobNotificationService } from '../services/notification/JobNotificationService';
 
 // Lazy initialization - AIService blir instantiert når den først brukes
 // Dette sikrer at dotenv.config() har kjørt først
@@ -261,6 +262,7 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
     // Save to database
     let savedCount = 0;
     let newJobsCount = 0;
+    const newJobIds: string[] = [];
     
     for (const job of uniqueJobs) {
       try {
@@ -272,7 +274,7 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
         const isNew = !existing;
         
         // Use upsert - it handles both create and update automatically
-        await prisma.jobListing.upsert({
+        const savedJob = await prisma.jobListing.upsert({
           where: { url: job.url },
           update: {
             title: job.title,
@@ -299,10 +301,18 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
         savedCount++;
         if (isNew) {
           newJobsCount++;
+          newJobIds.push(savedJob.id);
         }
       } catch (error) {
         logError('Error saving individual job', error as Error, { jobUrl: job.url, jobTitle: job.title });
       }
+    }
+    
+    // Send email notifications for new jobs (async, don't wait)
+    if (newJobIds.length > 0 && process.env.ENABLE_JOB_NOTIFICATIONS !== 'false') {
+      jobNotificationService.notifyUsersAboutNewJobs(newJobIds).catch((error) => {
+        logError('Error sending job notifications', error as Error);
+      });
     }
     
     // Note: We don't invalidate cache here because we want to cache the result
