@@ -5,6 +5,13 @@ import crypto from 'crypto';
 import prisma from '../config/database';
 import { sendVerificationEmail } from '../config/email';
 import { logError, logInfo } from '../config/logger';
+import {
+  validateEmail,
+  validatePassword,
+  validateStringLength,
+  sanitizeString,
+  validateRequiredFields,
+} from '../utils/validation';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -15,24 +22,29 @@ export const register = async (req: Request, res: Response): Promise<Response | 
   try {
     const { email, password, fullName } = req.body;
 
-    // Input validation
-    if (!email || !password || !fullName) {
-      return res.status(400).json({ error: 'All fields are required' });
+    // Input validation using utility functions
+    const validation = validateRequiredFields(req.body, ['email', 'password', 'fullName']);
+    if (!validation.isValid) {
+      return res.status(400).json({ 
+        error: 'All fields are required',
+        missingFields: validation.missingFields,
+      });
     }
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    // Sanitize and validate email
+    const sanitizedEmail = sanitizeString(email, 255).toLowerCase();
+    if (!validateEmail(sanitizedEmail)) {
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
-    // Full name validation
-    if (fullName.trim().length < 2 || fullName.trim().length > 100) {
+    // Sanitize and validate full name
+    const sanitizedFullName = sanitizeString(fullName, 100);
+    if (!validateStringLength(sanitizedFullName, 2, 100)) {
       return res.status(400).json({ error: 'Full name must be between 2 and 100 characters' });
     }
 
-    // Password strength validation
-    if (password.length < 8) {
+    // Validate password
+    if (!validatePassword(password)) {
       return res.status(400).json({ error: 'Password must be at least 8 characters long' });
     }
 
@@ -53,7 +65,7 @@ export const register = async (req: Request, res: Response): Promise<Response | 
 
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: sanitizedEmail },
     });
 
     if (existingUser) {
@@ -69,9 +81,9 @@ export const register = async (req: Request, res: Response): Promise<Response | 
     // Create user (needs email verification)
     const user = await prisma.user.create({
       data: {
-        email,
+        email: sanitizedEmail,
         passwordHash,
-        fullName,
+        fullName: sanitizedFullName,
         emailVerified: false,
         emailVerificationToken: verificationToken,
       },
@@ -85,7 +97,7 @@ export const register = async (req: Request, res: Response): Promise<Response | 
     });
 
     // Send verification email
-    await sendVerificationEmail(email, verificationToken, fullName);
+    await sendVerificationEmail(sanitizedEmail, verificationToken, sanitizedFullName);
     
     logInfo('User registered', { userId: user.id, email: user.email });
 
@@ -147,13 +159,18 @@ export const login = async (req: Request, res: Response): Promise<Response | voi
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
+    // Input validation using utility functions
+    const validation = validateRequiredFields(req.body, ['email', 'password']);
+    if (!validation.isValid) {
+      return res.status(400).json({ 
+        error: 'Email and password are required',
+        missingFields: validation.missingFields,
+      });
     }
 
-    // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    // Sanitize and validate email
+    const sanitizedEmail = sanitizeString(email, 255).toLowerCase();
+    if (!validateEmail(sanitizedEmail)) {
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
@@ -164,7 +181,7 @@ export const login = async (req: Request, res: Response): Promise<Response | voi
 
     // Find user
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: sanitizedEmail },
     });
 
     if (!user) {
