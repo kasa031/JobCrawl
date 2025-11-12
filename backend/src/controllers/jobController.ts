@@ -24,7 +24,7 @@ const getAIService = () => {
   return aiServiceInstance;
 };
 
-export const getJobs = async (req: Request, res: Response) => {
+export const getJobs = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     // Validate and sanitize query parameters
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
@@ -189,11 +189,11 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
     const rawLocation = (typeof req.body?.location === 'string' ? req.body.location : undefined) ||
                        (typeof req.query.location === 'string' ? req.query.location : undefined);
     
-    const keywords = validateKeywords(rawKeywords);
-    const location = validateLocation(rawLocation);
+    const keywords = validateKeywords(rawKeywords) || undefined;
+    const location = validateLocation(rawLocation) || undefined;
     
     // Check cache first
-    const cacheKey = CacheService.createJobSearchKey(keywords, location);
+    const cacheKey = CacheService.createJobSearchKey(keywords || undefined, location || undefined);
     const cachedResult = cacheService.get<{ totalScraped: number; saved: number; durationSeconds: number }>(cacheKey);
     
     if (cachedResult) {

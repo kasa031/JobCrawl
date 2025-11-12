@@ -25,7 +25,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../env') });
 
 // Initialize PORT and FRONTEND_URL before logging
-const PORT = process.env.PORT || 3000;
+const PORT = typeof process.env.PORT === 'string' ? parseInt(process.env.PORT, 10) : (process.env.PORT || 3000);
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // Log configuration to Winston
@@ -101,8 +101,8 @@ app.get('/api/health', async (_req, res) => {
 
   // Check AI service
   try {
-    const { getAIService } = await import('./services/ai/AIService');
-    const aiService = getAIService();
+    const { AIService } = await import('./services/ai/AIService');
+    const aiService = new AIService();
     const provider = (aiService as any).aiProvider || 'unknown';
     const hasApiKey = provider === 'openrouter' 
       ? !!(aiService as any).openrouterApiKey
@@ -132,7 +132,7 @@ app.get('/api/health', async (_req, res) => {
 
   // Check cache service
   try {
-    const { cacheService } = await import('./services/cache/CacheService');
+    await import('./services/cache/CacheService');
     healthStatus.services!.cache = { status: 'OK', message: 'Cache service available' };
   } catch (error) {
     healthStatus.services!.cache = { status: 'WARNING', message: 'Cache service check failed' };

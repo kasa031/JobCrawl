@@ -438,9 +438,6 @@ export const requestPasswordReset = async (req: Request, res: Response): Promise
       },
     });
 
-    // Send password reset email
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/JobCrawl/reset-password?token=${resetToken}`;
-    
     // Import and use email sending function
     const { sendPasswordResetEmail } = await import('../config/email');
     await sendPasswordResetEmail(sanitizedEmail, resetToken, user.fullName);

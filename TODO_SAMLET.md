@@ -56,26 +56,42 @@
 ## 🔴 HØY PRIORITET - Kritiske Mangler
 
 ### Backend
-1. **Kjør full-text search migration**
-   - SQL migration opprettet: `backend/prisma/migrations/add_fulltext_search.sql`
-   - **Status:** Ikke kjørt i databasen
-   - **Handling:** Kjør `psql -U postgres -d jobcrawl -f backend/prisma/migrations/add_fulltext_search.sql`
-   - **Etter:** Oppdater `jobController.ts` til å bruke full-text search (fjern TODO-kommentarer)
+1. **Fiks TypeScript-feil i backend build** 🔴 KRITISK
+   - **Status:** Backend build feiler med TypeScript-feil (påvirker ikke runtime, men blokkerer build)
+   - **Problemer:**
+     - Mangler type definitions: `@types/swagger-jsdoc`, `@types/swagger-ui-express`
+     - Prisma client mangler `refreshToken` model (må kjøre `npx prisma generate`)
+     - Type issues i `jobController.ts` (`string | null` vs `string | undefined`)
+     - Type issues i `profileController.ts` (`emailNotificationsEnabled`)
+     - Unused variables i `csrf.ts` og `errorUtils.ts`
+     - `validatePhone` eksisterer ikke i `validation.test.ts`
+   - **Handling:**
+     - `npm install --save-dev @types/swagger-jsdoc @types/swagger-ui-express`
+     - `npx prisma generate`
+     - Fiks type issues i controllers
+     - Fjern unused variables
+   - **Filer:** `backend/src/config/swagger.ts`, `backend/src/index.ts`, `backend/src/controllers/`
 
-2. ✅ **Refresh tokens system** - **FULLFØRT**
+2. **Kjør full-text search migration**
+   - SQL migration opprettet: `backend/prisma/migrations/add_fulltext_search.sql`
+   - **Status:** Ikke kjørt i databasen (men kode støtter fallback)
+   - **Handling:** Kjør `psql -U postgres -d jobcrawl -f backend/prisma/migrations/add_fulltext_search.sql`
+   - **Note:** Full-text search er allerede implementert med fallback til contains search
+
+3. ✅ **Refresh tokens system** - **FULLFØRT**
    - Backend refresh token endpoint implementert og lagt til i routes
    - Frontend integrasjon implementert med automatisk token refresh i API interceptor
    - Refresh token lagres i localStorage/sessionStorage basert på "Husk meg"
    - Automatisk token refresh ved 401 Unauthorized errors
    - **Filer:** `backend/src/routes/authRoutes.ts`, `frontend/src/services/api.ts`, `frontend/src/context/AuthContext.tsx`
 
-3. **Forbedret error handling i controllers**
+4. **Forbedret error handling i controllers**
    - **Status:** ErrorHandler middleware er allerede satt opp i `backend/src/index.ts`
    - **Status:** Controllers bruker try-catch med direkte error handling (dette er greit)
    - **Anbefaling:** Vurder å bruke `next(error)` i stedet for direkte `res.status().json()` for konsistent error handling
    - **Handling:** Dette er valgfritt - nåværende implementasjon fungerer, men kan forbedres for konsistens
 
-4. **Input validering forbedring**
+5. **Input validering forbedring**
    - **Status:** Validering brukes allerede mye (24 matches i controllers)
    - **Status:** Utility-funksjoner eksisterer (`validateEmail`, `validatePassword`, `validateUUID`, etc.)
    - **Status:** De fleste kritiske endpoints har validering
@@ -83,12 +99,12 @@
    - **Handling:** Dette er valgfritt - nåværende implementasjon er tilstrekkelig
 
 ### Database
-5. **Database query optimalisering**
+6. **Database query optimalisering**
    - Review alle Prisma queries
    - Sjekk at alle queries bruker riktige indexes
    - Vurder pagination for store resultater
 
-6. **Database indexing review**
+7. **Database indexing review**
    - Review alle indexes i schema
    - Legg til composite indexes der nødvendig
    - Sjekk query performance
@@ -98,37 +114,56 @@
 ## 🟡 MIDDELS PRIORITET - Viktige Forbedringer
 
 ### Frontend
-7. **React Query implementasjon**
+7. **Erstatt console.error med toast notifications** 🟡
+   - **Status:** Mange `console.error` i frontend som bør erstattes med toast
+   - **Filer:**
+     - `frontend/src/pages/JobsList.tsx` (linje 166)
+     - `frontend/src/pages/JobDetail.tsx` (linje 57, 105, 160)
+     - `frontend/src/pages/Profile.tsx` (linje 64, 82, 100, 135, 192)
+     - `frontend/src/utils/searchHistory.ts` (linje 30, 42, 51, 63)
+     - `frontend/src/utils/exportUtils.ts` (linje 343, 450)
+   - **Handling:** Erstatt `console.error` med `showToast(errorMessage, 'error')` der det gir mening
+
+8. **Forbedre error handling i utils** 🟡
+   - **Status:** `searchHistory.ts` og `exportUtils.ts` bruker bare `console.error`
+   - **Handling:** Forbedre error handling med toast notifications og bedre feilmeldinger
+
+9. **Preferences UI i frontend** 🟡
+   - **Status:** `preferences` field eksisterer i database og backend håndterer det
+   - **Status:** Frontend UI mangler i `Profile.tsx`
+   - **Handling:** Legg til UI for preferences (job search preferences, notification settings, etc.)
+
+10. **React Query implementasjon**
    - Nåværende: useState/useEffect for data fetching
    - **Handling:** 
      - Installer `@tanstack/react-query`
      - Migrer alle API calls til React Query
      - Forbedre caching og state management
 
-8. **Forbedret søkefunksjonalitet**
+11. **Forbedret søkefunksjonalitet**
    - Legg til flere filtre (lønnsnivå, remote, jobbtype, etc.)
    - Lagre søkepreferanser i localStorage
    - Avanserte søkefiltre
 
-9. ✅ **Bulk operations forbedring** - **DELVIS FULLFØRT**
+12. ✅ **Bulk operations forbedring** - **DELVIS FULLFØRT**
    - ✅ Bulk delete og bulk status update eksisterer for applications
    - ✅ Bulk export implementert (CSV, JSON, PDF)
    - **Mangler:** Bulk operations for favorites (lav prioritet)
 
-10. ✅ **Export forbedringer** - **FULLFØRT**
+13. ✅ **Export forbedringer** - **FULLFØRT**
     - CSV export implementert og integrert i Applications-siden
     - JSON export implementert og integrert i Applications-siden
     - Bulk PDF export implementert og integrert i Applications-siden
     - Bulk export-knapper lagt til i bulk actions toolbar
     - **Filer:** `frontend/src/pages/Applications.tsx`, `frontend/src/utils/exportUtils.ts`
 
-11. **Job detail forbedringer**
+14. **Job detail forbedringer**
     - Legg til "Relaterte stillinger" basert på skills/location
     - Legg til "Søk på lignende stillinger" funksjonalitet
     - Deling av stilling (share button)
 
 ### PWA - Testing og Forbedringer
-12. **PWA Testing**
+15. **PWA Testing**
     - [ ] Teste service worker registrering i development
     - [ ] Teste service worker i production build
     - [ ] Verifisere at manifest.json lastes korrekt
@@ -140,7 +175,7 @@
     - [ ] Teste installasjon på desktop (Chrome, Edge, Firefox)
     - [ ] Teste offline-funksjonalitet på alle plattformer
 
-13. ✅ **PWA Cache-strategi forbedring** - **FULLFØRT**
+16. ✅ **PWA Cache-strategi forbedring** - **FULLFØRT**
     - ✅ Network-first for `/api/jobs` (5 min cache)
     - ✅ Network-first for `/api/applications` (1 time cache)
     - ✅ Network-first for `/api/profile` (1 time cache)
@@ -150,14 +185,14 @@
     - **Status:** Cache-invalidering håndteres automatisk av Workbox
     - **Filer:** `frontend/vite.config.ts`
 
-14. ✅ **PWA Offline UI/UX** - **FULLFØRT**
+17. ✅ **PWA Offline UI/UX** - **FULLFØRT**
     - ✅ Vise cached data når offline (OfflineIndicator viser melding)
     - ✅ Vise melding når data er utdatert (indikator vises når offline)
     - ✅ Implementere "Retry" knapp for failed requests (med loading state)
     - ✅ Vise online/offline status tydelig
     - **Filer:** `frontend/src/components/OfflineIndicator.tsx`
 
-15. **Background Sync**
+18. **Background Sync**
     - [ ] Implementere Background Sync API
     - [ ] Queue API-kall når offline
     - [ ] Synkronisere når nettverk kommer tilbake
@@ -165,7 +200,7 @@
     - [ ] Vise sync-status til bruker
     - [ ] Teste background sync på mobil
 
-16. **App Shell Architecture**
+19. **App Shell Architecture**
     - [ ] Identifisere app shell (Layout, Navigation)
     - [ ] Cache app shell for rask initial load
     - [ ] Lazy load innhold basert på rute
@@ -355,10 +390,10 @@
 
 ## 📊 Oppsummering
 
-### Totalt: 46 oppgaver
-- **Fullført:** ~30 oppgaver ✅
-- **Høy prioritet:** 3 oppgaver 🔴 (full-text search, database optimalisering)
-- **Middels prioritet:** 7 oppgaver 🟡
+### Totalt: 50 oppgaver
+- **Fullført:** ~32 oppgaver ✅
+- **Høy prioritet:** 5 oppgaver 🔴 (TypeScript-feil, full-text search, database optimalisering)
+- **Middels prioritet:** 10 oppgaver 🟡
 - **Lav prioritet:** 30 oppgaver 🟢
 
 ### Nylig fullført:
@@ -366,16 +401,24 @@
 - ✅ Export forbedringer (CSV, JSON, bulk PDF)
 - ✅ PWA Cache-strategi forbedring
 - ✅ PWA Offline UI/UX (Retry knapp, loading state)
+- ✅ CV upload funksjonalitet (bekreftet fullført)
+- ✅ AI endpoints authentication (bekreftet fullført)
+- ✅ Phone field i Profile (bekreftet fullført)
 
 ### Kritiske mangler (må fikses først):
-1. Full-text search migration ikke kjørt (krever database tilgang)
-2. Database query optimalisering (kan gjøres senere)
-3. Database indexing review (kan gjøres senere)
+1. **TypeScript-feil i backend build** 🔴 KRITISK - Blokkerer build
+2. Full-text search migration ikke kjørt (krever database tilgang, men har fallback)
+3. Console.error i frontend bør erstattes med toast
+4. Preferences UI mangler i frontend
+5. Database query optimalisering (kan gjøres senere)
+6. Database indexing review (kan gjøres senere)
 
 ### Anbefalt rekkefølge:
-1. **Først:** Fikse kritiske mangler (1-6)
-2. **Deretter:** Viktige forbedringer (7-16)
-3. **Til slutt:** Nice-to-have funksjoner (17-46)
+1. **Først:** Fikse TypeScript-feil i backend build (KRITISK)
+2. **Deretter:** Fikse console.error i frontend (forbedrer UX)
+3. **Deretter:** Legg til Preferences UI
+4. **Deretter:** Kjør full-text search migration
+5. **Til slutt:** Nice-to-have funksjoner
 
 ---
 
@@ -389,5 +432,7 @@
 
 ---
 
-**Neste steg:** Fokuser på høy prioritet oppgaver først, spesielt full-text search migration og refresh tokens frontend integrasjon.
+**Neste steg:** Fokuser på høy prioritet oppgaver først, spesielt TypeScript-feil i backend build (KRITISK), deretter console.error i frontend og Preferences UI.
+
+**Se også:** `KODE_GJENNOMGANG.md` for detaljert gjennomgang av kodebasen.
 

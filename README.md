@@ -86,8 +86,8 @@ npm run dev
 ```
 
 **Eller bruk start script:**
-- Windows: Dobbelklikk `START_TESTING.bat`
-- Mac/Linux: `chmod +x START_TESTING.sh && ./START_TESTING.sh`
+- Windows: `scripts/START_TESTING.bat`
+- Mac/Linux: `chmod +x scripts/START_TESTING.sh && ./scripts/START_TESTING.sh`
 
 Frontend vil være tilgjengelig på http://localhost:5173/JobCrawl/
 Backend API vil være tilgjengelig på http://localhost:3000/api
@@ -244,7 +244,7 @@ The application uses a beautiful mocca/champagne color scheme:
 - Sjekk at backend server kjører på `http://localhost:3000`
 - Verifiser at database har jobber (eller bruk "Refresh Jobs" for å scrape)
 - Sjekk browser console for CORS eller nettverksfeil
-- Se `TROUBLESHOOTING_JOBS.md` for detaljert guide
+- Se [docs/troubleshooting/TROUBLESHOOTING_JOBS.md](docs/troubleshooting/TROUBLESHOOTING_JOBS.md) for detaljert guide
 
 ### Database Connection Issues
 - Sjekk at PostgreSQL kjører: `pg_isready`
@@ -268,14 +268,24 @@ The application uses a beautiful mocca/champagne color scheme:
 
 ## Dokumentasjon
 
-- **Testing Guide**: Se `TESTING_GUIDE.md` - Test på mobil, nettbrett og PC
-- **API Dokumentasjon**: Se `API_DOKUMENTASJON.md` - Komplett dokumentasjon av alle endpoints
-- **Environment Variables**: Se `backend/.env.example`
+Se [docs/README.md](docs/README.md) for komplett dokumentasjonsoversikt.
+
+### Hoveddokumentasjon
+- **Getting Started**: [docs/getting-started/](docs/getting-started/) - Oppstartsguider
+- **Setup Guide**: [docs/setup/](docs/setup/) - Setup og konfigurasjon
+- **API Dokumentasjon**: [docs/api/API_DOCUMENTATION.md](docs/api/API_DOCUMENTATION.md) - Komplett API dokumentasjon
+- **Testing Guide**: [docs/testing/TESTING_GUIDE.md](docs/testing/TESTING_GUIDE.md) - Test på mobil, nettbrett og PC
+- **Troubleshooting**: [docs/troubleshooting/](docs/troubleshooting/) - Feilsøking
+- **PWA Guide**: [docs/pwa/](docs/pwa/) - Progressive Web App installasjon
+- **Security**: [docs/security/](docs/security/) - Sikkerhetsregler og best practices
+- **Deployment**: [docs/deployment/](docs/deployment/) - Deploy-instruksjoner
+
+### Teknisk dokumentasjon
+- **Environment Variables**: Se `backend/env.example`
 - **API Endpoints**: Se seksjonen over
 - **Database Schema**: Se `backend/prisma/schema.prisma`
-- **Forbedringer**: Se `FORBEDRINGER.md`
-- **TODO Liste**: Se `TODO.md`
-- **Troubleshooting**: Se `TROUBLESHOOTING_JOBS.md` og `FIX_PORT_3000.md`
+- **Project Architecture**: [docs/development/PROJECT_ARCHITECTURE.md](docs/development/PROJECT_ARCHITECTURE.md)
+- **TODO Liste**: Se [TODO_SAMLET.md](TODO_SAMLET.md)
 
 ## License
 MIT

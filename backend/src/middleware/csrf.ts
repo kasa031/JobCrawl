@@ -34,7 +34,7 @@ export const verifyCSRFToken = (sessionId: string, token: string): boolean => {
 // CSRF protection middleware (optional - can be enabled per route)
 // Note: For API-only applications, CSRF is less critical since we use JWT tokens
 // This is mainly for form submissions if we add traditional HTML forms
-export const csrfProtection = (req: Request, res: Response, next: NextFunction): Response | void => {
+export const csrfProtection = (req: Request, _res: Response, next: NextFunction): Response | void => {
   // Skip CSRF for GET, HEAD, OPTIONS requests
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
     return next();
@@ -42,13 +42,12 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction):
   
   // Skip CSRF for API endpoints that use JWT (already protected)
   // CSRF is mainly for cookie-based sessions
-  const token = req.headers['x-csrf-token'] as string;
-  const sessionId = req.headers['x-session-id'] as string || req.ip || 'unknown';
-  
   // For now, we'll skip CSRF since we use JWT tokens
   // This middleware is here for future use if we add cookie-based sessions
   // Uncomment below to enable CSRF protection:
   /*
+  const token = req.headers['x-csrf-token'] as string;
+  const sessionId = req.headers['x-session-id'] as string || req.ip || 'unknown';
   if (!token || !verifyCSRFToken(sessionId, token)) {
     logWarn('CSRF token validation failed', {
       ip: req.ip,

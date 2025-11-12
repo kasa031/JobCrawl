@@ -4,7 +4,7 @@ import {
   validatePassword,
   validateStringLength,
   validateUUID,
-  validatePhone,
+  validatePhoneNumber,
   validateKeywords,
   validateLocation,
 } from './validation';
@@ -79,16 +79,16 @@ describe('Validation Utilities', () => {
     });
   });
 
-  describe('validatePhone', () => {
+  describe('validatePhoneNumber', () => {
     it('should validate Norwegian phone numbers', () => {
-      expect(validatePhone('+47 123 45 678')).toBe(true);
-      expect(validatePhone('12345678')).toBe(true);
-      expect(validatePhone('+47 12 34 56 78')).toBe(true);
+      expect(validatePhoneNumber('+47 123 45 678')).toBe(true);
+      expect(validatePhoneNumber('12345678')).toBe(true);
+      expect(validatePhoneNumber('+47 12 34 56 78')).toBe(true);
     });
 
     it('should reject invalid phone numbers', () => {
-      expect(validatePhone('abc')).toBe(false);
-      expect(validatePhone('123')).toBe(false); // Too short
+      expect(validatePhoneNumber('abc')).toBe(false);
+      expect(validatePhoneNumber('123')).toBe(false); // Too short
     });
   });
 

@@ -66,6 +66,11 @@ coverage/
 temp/
 tmp/
 
+# Sensitive backup files
+*_BACKUP.txt
+*PASSWORD*.txt
+ICLOUD_PASSWORD_BACKUP.txt
+
 # Cursor AI rules (may contain project-specific config)
 .cursorrules
 

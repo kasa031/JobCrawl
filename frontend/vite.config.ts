@@ -96,7 +96,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB (default is 2 MB)
+        maximumFileSizeToCacheInBytes: 15 * 1024 * 1024, // 15 MB (default is 2 MB) - increased for large images
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/api\./i,

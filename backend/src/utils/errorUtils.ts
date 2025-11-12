@@ -8,7 +8,7 @@ import { logError, logWarn } from '../config/logger';
 /**
  * Handle database errors and convert to user-friendly messages
  */
-export function handleDatabaseError(error: unknown, context?: string): AppError {
+export function handleDatabaseError(error: unknown, _context?: string): AppError {
   const err = error as Error;
   const errorMessage = err.message.toLowerCase();
 
