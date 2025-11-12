@@ -13,6 +13,7 @@ import {
   formatSearchHistoryItem,
   type SearchHistoryItem 
 } from '../utils/searchHistory';
+import { formatSource } from '../utils/formatSource';
 
 interface Job {
   id: string;
@@ -54,10 +55,32 @@ function JobsList() {
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const historyRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Debounced search - wait 500ms after user stops typing before loading jobs
+  useEffect(() => {
+    // Clear previous timeout
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    // Set new timeout for debounced search
+    searchDebounceRef.current = setTimeout(() => {
+      loadJobs();
+    }, 500); // Wait 500ms after user stops typing
+
+    // Cleanup function
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, [searchTerm, locationFilter, sourceFilter]); // Removed currentPage from dependencies
+
+  // Load jobs immediately when page changes (no debounce needed)
   useEffect(() => {
     loadJobs();
-  }, [currentPage, searchTerm, locationFilter, sourceFilter]);
+  }, [currentPage]);
 
   useEffect(() => {
     setSearchHistory(getSearchHistory());
@@ -117,7 +140,12 @@ function JobsList() {
   }, [showHistory]);
 
   const loadJobs = async () => {
-    setLoading(true);
+    // Don't show loading spinner for debounced searches (only for initial load and page changes)
+    const isInitialLoad = jobs.length === 0 && loading;
+    if (isInitialLoad || currentPage !== 1) {
+      setLoading(true);
+    }
+    
     try {
       const response = await jobsAPI.getJobs({
         page: currentPage,
@@ -129,9 +157,24 @@ function JobsList() {
       setJobs(response.jobs || []);
       setTotalPages(response.pagination?.pages || 1);
       setTotalJobs(response.pagination?.total || 0);
-    } catch (error) {
+    } catch (error: any) {
+      // Ignore errors from browser extensions
+      if (error.stack && error.stack.includes('content_script.js')) {
+        return;
+      }
+      
       console.error('Error loading jobs:', error);
-      showToast('Kunne ikke laste inn stillinger', 'error');
+      const errorMessage = error.response?.data?.error || error.message || 'Kunne ikke laste inn stillinger';
+      
+      // Only show toast for actual errors, not network issues that might be temporary
+      if (error.response?.status !== 503 || isInitialLoad) {
+        showToast(errorMessage, 'error');
+      }
+      
+      // Set empty state if error
+      setJobs([]);
+      setTotalPages(1);
+      setTotalJobs(0);
     } finally {
       setLoading(false);
     }
@@ -141,7 +184,6 @@ function JobsList() {
     setRefreshing(true);
     try {
       const result = await jobsAPI.refreshJobs(searchTerm || undefined, locationFilter || undefined);
-      console.log('Refresh result:', result);
       
       // Save to search history
       if (searchTerm || locationFilter) {
@@ -163,10 +205,12 @@ function JobsList() {
           setJobs(response.jobs || []);
           setTotalPages(response.pagination?.pages || 1);
           setTotalJobs(response.pagination?.total || 0);
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error loading jobs:', error);
           setSearchTerm(originalSearchTerm);
           setLocationFilter(originalLocationFilter);
+          const errorMsg = error.response?.data?.error || 'Kunne ikke laste inn stillinger';
+          showToast(errorMsg, 'error');
         } finally {
           setLoading(false);
         }
@@ -337,9 +381,8 @@ function JobsList() {
                       </button>
                     </div>
                     {searchHistory.map((item) => (
-                      <button
+                      <div
                         key={`${item.keywords}-${item.location}-${item.timestamp}`}
-                        type="button"
                         onClick={() => handleHistoryItemClick(item)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
@@ -347,8 +390,9 @@ function JobsList() {
                             handleHistoryItemClick(item);
                           }
                         }}
-                        className="w-full text-left px-4 py-2 hover:bg-mocca-100 transition-colors flex justify-between items-center group"
+                        className="w-full text-left px-4 py-2 hover:bg-mocca-100 transition-colors flex justify-between items-center group cursor-pointer"
                         role="option"
+                        tabIndex={0}
                         aria-label={`Søk: ${formatSearchHistoryItem(item)}`}
                       >
                         <span className="text-dark-text">{formatSearchHistoryItem(item)}</span>
@@ -356,6 +400,7 @@ function JobsList() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
+                            e.preventDefault();
                             removeSearchHistoryItem(item.keywords, item.location);
                             setSearchHistory(getSearchHistory());
                           }}
@@ -364,7 +409,7 @@ function JobsList() {
                         >
                           ✕
                         </button>
-                      </button>
+                      </div>
                     ))}
                   </motion.div>
                 )}
@@ -504,7 +549,7 @@ function JobsList() {
                     </button>
                   )}
                   <span className="bg-mocca-300 dark:bg-mocca-600 text-dark-text dark:text-gray-100 px-3 py-1 rounded-full text-sm font-semibold">
-                    {job.source}
+                    {formatSource(job.source)}
                   </span>
                 </div>
               </div>

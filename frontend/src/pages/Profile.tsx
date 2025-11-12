@@ -19,6 +19,7 @@ function Profile() {
   const [location, setLocation] = useState('');
   const [phone, setPhone] = useState('');
   const [bio, setBio] = useState('');
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true);
   const [cvPath, setCvPath] = useState<string | null>(null);
   const [cvUploading, setCvUploading] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -128,6 +129,7 @@ function Profile() {
         setPhone(profile.phone || '');
         setCvPath(profile.cvPath || null);
         setBio(profile.bio || '');
+        setEmailNotificationsEnabled(profile.emailNotificationsEnabled !== undefined ? profile.emailNotificationsEnabled : true);
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -182,6 +184,7 @@ function Profile() {
         location,
         phone,
         bio,
+        emailNotificationsEnabled,
       });
       showToast('Profil lagret!', 'success');
       await refreshUser();
@@ -480,6 +483,26 @@ function Profile() {
                   className="w-full px-4 py-2 rounded-lg border border-mocca-300 bg-white text-dark-text focus:outline-none focus:border-mocca-400 resize-none"
                   placeholder="Tell us about yourself..."
                 />
+              </div>
+
+              {/* Email Notifications */}
+              <div>
+                <h2 className="text-2xl font-bold text-dark-heading mb-4">Varsler</h2>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="emailNotifications"
+                    checked={emailNotificationsEnabled}
+                    onChange={(e) => setEmailNotificationsEnabled(e.target.checked)}
+                    className="w-5 h-5 text-mocca-400 rounded focus:ring-mocca-400 focus:ring-2"
+                  />
+                  <label htmlFor="emailNotifications" className="text-dark-text font-semibold cursor-pointer">
+                    Send meg e-post når nye relevante jobber blir funnet
+                  </label>
+                </div>
+                <p className="text-dark-secondary text-sm mt-2 ml-8">
+                  Du vil motta e-postvarsler basert på din profil og ferdigheter
+                </p>
               </div>
 
             <button

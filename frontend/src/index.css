@@ -4,22 +4,46 @@
 
 @layer base {
   :root {
-    --mocca-50: #FAF5F0;
-    --mocca-100: #F5ECE2;
-    --mocca-200: #E8D5C1;
-    --mocca-300: #D4B99A;
-    --mocca-400: #C29B73;
-    --mocca-500: #A67E5A;
-    --mocca-600: #8B6B47;
-    --mocca-700: #6B5439;
+    /* Primary colors - Orange tones from images */
+    --primary-50: #FFF5F0;
+    --primary-100: #FFE8D6;
+    --primary-200: #FFD4B3;
+    --primary-300: #FFB380;
+    --primary-400: #FF8C42;
+    --primary-500: #FF6B1A;
+    --primary-600: #E55A00;
+    --primary-700: #CC4D00;
     
-    --text-primary: #3D2F1F;
-    --text-heading: #2A2018;
-    --text-subheading: #4A3F2F;
-    --text-secondary: #6B5439;
+    /* Secondary colors - Blue tones from images */
+    --secondary-50: #F0F7FF;
+    --secondary-100: #D6EBFF;
+    --secondary-200: #B3D9FF;
+    --secondary-300: #80C0FF;
+    --secondary-400: #4DA6FF;
+    --secondary-500: #1A8CFF;
+    --secondary-600: #0073E5;
+    --secondary-700: #005ACC;
     
-    --champaigne: #F7E7CE;
-    --accent: #B8956A;
+    /* Updated mocca colors - warmer orange tones */
+    --mocca-50: #FFF8F0;
+    --mocca-100: #FFF0E0;
+    --mocca-200: #FFE0C0;
+    --mocca-300: #FFC880;
+    --mocca-400: #FFA042;
+    --mocca-500: #E57A1A;
+    --mocca-600: #CC6600;
+    --mocca-700: #B35200;
+    
+    /* Text colors - updated for better contrast */
+    --text-primary: #2C2C2C;
+    --text-heading: #1A1A1A;
+    --text-subheading: #404040;
+    --text-secondary: #666666;
+    
+    /* Accent colors */
+    --champaigne: #FFF5E6;
+    --accent: #FF8C42;
+    --accent-blue: #4DA6FF;
   }
   
   * {
@@ -27,8 +51,9 @@
   }
   
   body {
-    @apply bg-mocca-50 dark:bg-gray-900 text-dark-text dark:text-gray-100 antialiased;
+    @apply bg-gradient-to-br from-primary-50 via-orange-50 to-secondary-50 dark:bg-gray-900 text-dark-text dark:text-gray-100 antialiased;
     transition: background-color 0.3s ease, color 0.3s ease;
+    min-height: 100vh;
   }
   
   h1, h2, h3, h4, h5, h6 {

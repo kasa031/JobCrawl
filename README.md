@@ -18,11 +18,14 @@ JobCrawl er en intelligent jobbsøknadspasient designet for bachelorprosjekt. Sy
 Se [docs/FEATURES.md](docs/FEATURES.md) for en komplett liste over alle funksjoner.
 
 ## Technology Stack
-- **Frontend**: React 18, TypeScript, Tailwind CSS
+- **Frontend**: React 18, TypeScript, Tailwind CSS, Framer Motion
 - **Backend**: Node.js, Express, TypeScript
 - **Database**: PostgreSQL, Prisma ORM
 - **Scraping**: Puppeteer, Cheerio
-- **AI**: OpenAI API
+- **AI**: OpenAI API / OpenRouter (gratis) / Google Gemini (gratis)
+- **Email**: Nodemailer med SMTP support (Gmail, iCloud, MailHog)
+- **Logging**: Winston
+- **Authentication**: JWT
 
 ## Project Structure
 ```
@@ -38,35 +41,181 @@ jobcrawl/
 ### Prerequisites
 - Node.js 18+
 - PostgreSQL 14+
-- npm or yarn
+- npm eller yarn
+- (Valgfritt) MailHog for email testing i development
 
 ### Installation
+
+1. **Klon repositoriet:**
+```bash
+git clone <repository-url>
+cd JobCrawl
+```
+
+2. **Installer alle dependencies:**
 ```bash
 npm run install:all
 ```
 
-### Development
+3. **Sett opp database:**
 ```bash
+cd backend
+npx prisma migrate dev
+# eller
+npx prisma db push
+```
+
+4. **Konfigurer environment variabler:**
+- Kopier `backend/.env.example` til `backend/env`
+- Fyll ut påkrevde variabler (DATABASE_URL, JWT_SECRET)
+- Se `backend/.env.example` for detaljert dokumentasjon
+
+5. **Start utviklingsserver:**
+```bash
+# Fra root directory
+npm run dev
+
+# Eller separat:
+# Terminal 1 - Backend
+cd backend
+npm run dev
+
+# Terminal 2 - Frontend
+cd frontend
 npm run dev
 ```
 
-This will start both frontend and backend in development mode.
+**Eller bruk start script:**
+- Windows: Dobbelklikk `START_TESTING.bat`
+- Mac/Linux: `chmod +x START_TESTING.sh && ./START_TESTING.sh`
+
+Frontend vil være tilgjengelig på http://localhost:5173/JobCrawl/
+Backend API vil være tilgjengelig på http://localhost:3000/api
+
+### 📱 Testing på Mobil, Nettbrett og PC
+
+JobCrawl er konfigurert for testing på alle enheter på samme Wi-Fi nettverk!
+
+**Se `TESTING_GUIDE.md` for detaljerte instruksjoner.**
+
+**Kort versjon:**
+1. Start både backend og frontend (se over)
+2. Noter IP-adressen som vises i terminalen (f.eks. `192.168.1.252`)
+3. På mobil/nettbrett: Åpne `http://[IP-ADRESSE]:5173/JobCrawl/` i nettleseren
+4. Alle enheter må være på samme Wi-Fi nettverk
 
 ### Environment Setup
-Create `.env` files in both `frontend/` and `backend/` directories:
 
-**Backend `.env`:**
+#### Backend Environment Variables
+
+Kopier `backend/.env.example` til `backend/env` og fyll ut verdiene:
+
+**Påkrevde variabler:**
 ```env
 DATABASE_URL=postgresql://user:password@localhost:5432/jobcrawl
-JWT_SECRET=your_secret_key
-OPENAI_API_KEY=your_openai_key
-PORT=3000
+JWT_SECRET=your_super_secret_jwt_key_minimum_32_characters
 ```
 
-**Frontend `.env`:**
+**Valgfrie variabler (har standardverdier):**
+```env
+PORT=3000
+NODE_ENV=development
+FRONTEND_URL=http://localhost:5173
+
+# AI Configuration (velg én provider)
+AI_PROVIDER=openai  # eller 'openrouter' eller 'gemini'
+OPENAI_API_KEY=your_openai_api_key
+# ELLER
+OPENROUTER_API_KEY=your_openrouter_api_key  # Gratis tier
+# ELLER
+GEMINI_API_KEY=your_gemini_api_key  # Gratis tier
+
+# Email Configuration (valgfritt - bruk MailHog for development)
+SMTP_HOST=localhost
+SMTP_PORT=1025
+```
+
+**Se `backend/.env.example` for komplett liste over alle variabler med dokumentasjon.**
+
+#### Frontend Environment Variables
+
+Opprett `frontend/.env`:
 ```env
 VITE_API_URL=http://localhost:3000/api
 ```
+
+#### MailHog Setup (for Email Testing)
+
+For development, kan du bruke MailHog for å teste email funksjonalitet:
+
+1. Last ned MailHog fra https://github.com/mailhog/MailHog
+2. Start MailHog: `./mailhog.exe` (Windows) eller `mailhog` (Linux/Mac)
+3. MailHog UI: http://localhost:8025
+4. Sett i `backend/env`:
+   ```env
+   SMTP_HOST=localhost
+   SMTP_PORT=1025
+   ```
+
+## API Endpoints
+
+### Health Check
+```
+GET /api/health
+```
+Returnerer status for alle tjenester (database, AI, email, cache).
+
+### Authentication
+```
+POST /api/auth/register
+POST /api/auth/login
+GET  /api/auth/me
+GET  /api/auth/verify-email
+POST /api/auth/resend-verification
+POST /api/auth/forgot-password
+POST /api/auth/reset-password
+```
+
+### Jobs
+```
+GET  /api/jobs
+GET  /api/jobs/:id
+POST /api/jobs/refresh
+```
+
+### Applications
+```
+GET    /api/applications
+POST   /api/applications
+PUT    /api/applications/:id
+DELETE /api/applications/:id
+POST   /api/applications/bulk/delete
+POST   /api/applications/bulk/update-status
+```
+
+### AI
+```
+POST /api/ai/cover-letter
+POST /api/ai/cover-letter-from-text
+POST /api/ai/match
+POST /api/ai/suggest-improvements
+```
+
+### Profile
+```
+GET    /api/profile
+PUT    /api/profile
+POST   /api/profile/cv
+DELETE /api/profile/cv
+GET    /api/profile/cv
+```
+
+### Analytics
+```
+GET /api/analytics
+```
+
+**Se `backend/.env.example` for detaljert dokumentasjon av alle variabler.**
 
 ## Deployment
 
@@ -88,6 +237,45 @@ The application uses a beautiful mocca/champagne color scheme:
 - **Text**: `#3D2F1F` (Dark brown)
 - **Headings**: `#2A2018` (Bold dark)
 - **Buttons**: `#C29B73` (Medium mocca)
+
+## Troubleshooting
+
+### Jobs Not Loading
+- Sjekk at backend server kjører på `http://localhost:3000`
+- Verifiser at database har jobber (eller bruk "Refresh Jobs" for å scrape)
+- Sjekk browser console for CORS eller nettverksfeil
+- Se `TROUBLESHOOTING_JOBS.md` for detaljert guide
+
+### Database Connection Issues
+- Sjekk at PostgreSQL kjører: `pg_isready`
+- Verifiser DATABASE_URL format: `postgresql://user:password@host:port/database`
+- Test tilkobling: `npx prisma db pull`
+
+### Email Issues
+- For development: Bruk MailHog (http://localhost:8025)
+- For produksjon: Konfigurer SMTP (Gmail/iCloud)
+- Sjekk app passwords for Gmail/iCloud
+
+### AI Service Issues
+- Sjekk at API key er satt riktig
+- Verifiser AI_PROVIDER setting
+- Test med health check: `GET /api/health`
+
+### Authentication Issues
+- Sjekk at JWT_SECRET er satt (minimum 32 tegn)
+- Verifiser token i browser DevTools
+- Sjekk at email er verifisert før innlogging
+
+## Dokumentasjon
+
+- **Testing Guide**: Se `TESTING_GUIDE.md` - Test på mobil, nettbrett og PC
+- **API Dokumentasjon**: Se `API_DOKUMENTASJON.md` - Komplett dokumentasjon av alle endpoints
+- **Environment Variables**: Se `backend/.env.example`
+- **API Endpoints**: Se seksjonen over
+- **Database Schema**: Se `backend/prisma/schema.prisma`
+- **Forbedringer**: Se `FORBEDRINGER.md`
+- **TODO Liste**: Se `TODO.md`
+- **Troubleshooting**: Se `TROUBLESHOOTING_JOBS.md` og `FIX_PORT_3000.md`
 
 ## License
 MIT

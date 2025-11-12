@@ -42,8 +42,8 @@ function Home() {
         const response = await analyticsAPI.getAnalytics();
         setAnalytics(response.analytics);
       } catch (error: any) {
-        console.error('Error loading analytics:', error);
-        // Don't show toast for analytics errors, just fail silently
+        // Analytics errors are non-critical, fail silently to avoid annoying users
+        // The dashboard will simply not show if analytics fail to load
       }
     };
 

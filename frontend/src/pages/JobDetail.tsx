@@ -6,6 +6,7 @@ import { jobsAPI, applicationsAPI, aiAPI, favoritesAPI } from '../services/api';
 import LoginModal from '../components/LoginModal';
 import { useToast } from '../components/Toast';
 import { Skeleton } from '../components/Skeleton';
+import { formatSource } from '../utils/formatSource';
 
 interface Job {
   id: string;
@@ -247,7 +248,7 @@ function JobDetail() {
                   📍 {job.location}
                 </p>
                 <span className="bg-mocca-300 dark:bg-mocca-600 text-dark-text dark:text-gray-100 px-3 py-1 rounded-full text-sm font-semibold">
-                  {job.source}
+                  {formatSource(job.source)}
                 </span>
               </div>
             </div>
@@ -445,7 +446,7 @@ function JobDetail() {
             <div className="grid md:grid-cols-2 gap-4 text-sm">
               <div>
                 <strong className="text-dark-heading dark:text-gray-100">Kilde:</strong>{' '}
-                <span className="text-dark-text dark:text-gray-300">{job.source}</span>
+                <span className="text-dark-text dark:text-gray-300">{formatSource(job.source)}</span>
               </div>
               {job.publishedDate && (
                 <div>

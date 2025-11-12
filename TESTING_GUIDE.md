@@ -1,249 +1,217 @@
-# 🧪 Testing Guide - JobCrawl
+# 📱 Testing Guide - JobCrawl på Mobil, Nettbrett og PC
 
-## 📋 Test Oppgaver
+## 🚀 Rask Start
 
-### 1. Backend Health Endpoint Test
-
-**Test backend server status:**
-```powershell
+### 1. Start Backend
+```bash
 cd backend
-npm run test:health
+npm run dev
 ```
 
-**Forventet resultat:**
+Du skal se:
 ```
-✅ Health Check PASSED
-   Status: 200
-   Response: {
-     "status": "OK",
-     "message": "JobCrawl API is running",
-     "timestamp": "..."
-   }
+🚀 JobCrawl Backend Server Started!
+   Local:   http://localhost:3000/api
+   Network: http://192.168.1.252:3000/api
+
+📱 For mobile/tablet testing, use: http://192.168.1.252:3000/api
 ```
 
-**Feilsøking:**
-- Hvis `ECONNREFUSED`: Start backend med `npm run dev`
-- Hvis `timeout`: Sjekk at backend kjører på port 3000
-
----
-
-### 2. Frontend til Backend Connection Test
-
-**Test at frontend kan nå backend:**
-```powershell
+### 2. Start Frontend
+```bash
 cd frontend
-npm run test:connection
+npm run dev
 ```
 
-**Forventet resultat:**
+Du skal se:
 ```
-✅ Connection TEST PASSED
-   Status: 200
+  VITE v5.x.x  ready in xxx ms
+
+  ➜  Local:   http://localhost:5173/JobCrawl/
+  ➜  Network: http://192.168.1.252:5173/JobCrawl/
 ```
 
-**Feilsøking:**
-- Sjekk at både frontend og backend kjører
-- Verifiser `frontend/.env` har riktig `VITE_API_URL`
-- Sjekk CORS konfigurasjon i backend
+## 📱 Tilgang fra Mobil og Nettbrett
 
----
+### Viktig: Alle enheter må være på samme Wi-Fi nettverk!
 
-### 3. SMTP Configuration Test
+### Steg 1: Finn din PC's IP-adresse
+Backend serveren viser automatisk IP-adressen når den starter. Se etter:
+```
+Network: http://192.168.x.x:3000/api
+```
 
-**Test email sending konfigurasjon:**
+Eller kjør manuelt:
 ```powershell
-cd backend
-npm run test:smtp
+# Windows
+ipconfig | findstr IPv4
+
+# Mac/Linux
+ifconfig | grep "inet "
 ```
 
-**Forventet resultat:**
+### Steg 2: Åpne på mobil/nettbrett
+
+**På mobil/nettbrett nettleser:**
 ```
-✅ SMTP Configuration VALID
-   Connection test passed
+http://[DIN-IP-ADRESSE]:5173/JobCrawl/
 ```
 
-**Feilsøking:**
-- `EAUTH`: Feil brukernavn/passord
-- `ECONNECTION`: Feil SMTP_HOST eller PORT
-- For Gmail: Bruk app password, ikke vanlig passord
+Eksempel:
+```
+http://192.168.1.252:5173/JobCrawl/
+```
 
----
+### Steg 3: Konfigurer API URL (hvis nødvendig)
 
-### 4. Database Setup Test
+Hvis frontend ikke kobler til backend automatisk, opprett `frontend/.env`:
+```env
+VITE_API_URL=http://[DIN-IP-ADRESSE]:3000/api
+```
 
-**Test database tilkobling:**
+Eksempel:
+```env
+VITE_API_URL=http://192.168.1.252:3000/api
+```
+
+**Viktig:** Restart frontend serveren etter å ha lagt til `.env` filen!
+
+## 🖥️ Testing på PC
+
+### Lokalt (localhost)
+```
+http://localhost:5173/JobCrawl/
+```
+
+### Fra nettverket (samme som mobil)
+```
+http://[DIN-IP-ADRESSE]:5173/JobCrawl/
+```
+
+## ✅ Sjekkliste før Testing
+
+- [ ] Backend server kjører (se terminal)
+- [ ] Frontend server kjører (se terminal)
+- [ ] Mobil/nettbrett er på samme Wi-Fi som PC
+- [ ] Firewall tillater tilkoblinger (se nedenfor)
+- [ ] IP-adresse er notert ned
+
+## 🔥 Windows Firewall Konfigurasjon
+
+Hvis du ikke kan koble til fra mobil/nettbrett:
+
+### Automatisk (Anbefalt)
 ```powershell
-cd backend
-npm run check-setup
+# Tillat Node.js gjennom firewall
+netsh advfirewall firewall add rule name="Node.js Backend" dir=in action=allow protocol=TCP localport=3000
+netsh advfirewall firewall add rule name="Node.js Frontend" dir=in action=allow protocol=TCP localport=5173
 ```
 
-**Forventet resultat:**
-```
-✅ Database accessible (Users: X)
-```
+### Manuelt
+1. Åpne "Windows Defender Firewall"
+2. Klikk "Advanced settings"
+3. Klikk "Inbound Rules" → "New Rule"
+4. Velg "Port" → Next
+5. Velg "TCP" og spesifiser portene: `3000` og `5173`
+6. Velg "Allow the connection"
+7. Apply til alle profiler
+8. Gi regelen et navn (f.eks. "JobCrawl Development")
 
----
+## 📋 Testing Scenarios
 
-## 🧪 Manuell Testing Checklist
+### 1. Basic Funksjonalitet
+- [ ] Last inn jobbliste
+- [ ] Søk etter jobber
+- [ ] Filtrer på lokasjon
+- [ ] Se jobbdetaljer
 
-### Registrering og Login Flow
+### 2. Autentisering
+- [ ] Registrer ny bruker
+- [ ] Logg inn
+- [ ] "Husk meg" funksjonalitet
+- [ ] Glemt passord
 
-1. **Registrering**
-   - [ ] Gå til http://localhost:5173
-   - [ ] Klikk "Login" → "Sign Up"
-   - [ ] Fyll ut:
-     - Full Name: Test User
-     - Email: test@example.com
-     - Password: Test1234!
-   - [ ] Klikk "Register"
-   - [ ] Skal se: "Account created! Check your email to verify."
+### 3. Profil
+- [ ] Oppdater profil
+- [ ] Last opp CV
+- [ ] Aktiver/deaktiver e-postvarsler
 
-2. **Email Verifisering**
-   - [ ] Sjekk backend konsoll for verifiseringslink
-   - [ ] ELLER sjekk email inbox
-   - [ ] Klikk på verifiseringslink
-   - [ ] Skal se: "Email verified successfully"
+### 4. AI Funksjonalitet
+- [ ] Generer søknadsbrev
+- [ ] Se match score
+- [ ] Få forbedringsforslag
 
-3. **Login**
-   - [ ] Klikk "Login"
-   - [ ] Skriv inn email: test@example.com
-   - [ ] Skriv inn password: Test1234!
-   - [ ] Klikk "Login"
-   - [ ] Skal logge inn og vise Home page
-   - [ ] Navn skal vises i header
+### 5. Søknader
+- [ ] Opprett søknad
+- [ ] Oppdater status
+- [ ] Bulk operasjoner
+- [ ] Eksporter til PDF/Word
 
----
+### 6. Responsive Design
+- [ ] Test på mobil (portrett)
+- [ ] Test på nettbrett (landskap)
+- [ ] Test på PC (desktop)
+- [ ] Sjekk at alle knapper er klikkbare
+- [ ] Sjekk at tekst er lesbar
 
-### Profile Management
+## 🐛 Troubleshooting
 
-4. **Oppdater Profile**
-   - [ ] Gå til "My Profile"
-   - [ ] Fyll ut:
-     - Skills: JavaScript, React, Node.js
-     - Experience: 3
-     - Education: Bachelor in CS
-     - Location: Oslo
-     - Phone: +47 123 45 678
-     - Bio: Test bio
-   - [ ] Klikk "Save Profile"
-   - [ ] Skal se success melding
+### "Cannot connect" på mobil/nettbrett
+1. Sjekk at alle enheter er på samme Wi-Fi
+2. Sjekk Windows Firewall (se over)
+3. Sjekk at backend/frontend kjører
+4. Prøv å ping PC fra mobil: `ping [IP-ADRESSE]`
 
-5. **CV Upload**
-   - [ ] Scroll ned til "CV Management"
-   - [ ] Klikk "Choose File"
-   - [ ] Velg en PDF fil
-   - [ ] Klikk "Upload CV"
-   - [ ] Skal se CV navn
-   - [ ] Test "Download CV"
-   - [ ] Test "Delete CV"
+### "CORS error" i nettleser
+- Backend er konfigurert til å tillate alle origins i development
+- Hvis du fortsatt får CORS-feil, sjekk at backend kjører
 
----
+### "API URL not found"
+- Sjekk at `VITE_API_URL` i `frontend/.env` matcher backend IP
+- Restart frontend serveren etter endringer
 
-### Job Browsing
+### Port allerede i bruk
+Se `FIX_PORT_3000.md` for løsning
 
-6. **Se Jobs**
-   - [ ] Gå til "Jobs"
-   - [ ] Skal se liste over jobber
-   - [ ] Test søkefunksjon (skriv "developer")
-   - [ ] Test location filter (skriv "Oslo")
-   - [ ] Test source filter (velg "finn.no")
+## 📊 Test på Forskjellige Enheter
 
-7. **Job Details**
-   - [ ] Klikk "View Details" på en jobb
-   - [ ] Skal se full job description
-   - [ ] Skal se requirements
-   - [ ] Test "Open Original" knapp
-   - [ ] Skal åpne i ny fane
+### iPhone/iPad
+1. Åpne Safari
+2. Gå til `http://[IP]:5173/JobCrawl/`
+3. Test alle funksjoner
 
----
+### Android
+1. Åpne Chrome
+2. Gå til `http://[IP]:5173/JobCrawl/`
+3. Test alle funksjoner
 
-### Applications
+### Nettbrett
+1. Test både portrett og landskap
+2. Sjekk at UI tilpasser seg skjermstørrelse
 
-8. **Apply to Job**
-   - [ ] På job detail side
-   - [ ] Klikk "Apply with AI Cover Letter"
-   - [ ] Skal generere cover letter
-   - [ ] Skal opprette application
-   - [ ] Skal redirect til Applications siden
+## 🔒 Sikkerhet i Development
 
-9. **View Applications**
-   - [ ] Gå til "Applications"
-   - [ ] Skal se dine søknader
-   - [ ] Skal se status (DRAFT, SENT, etc.)
-   - [ ] Test oppdater status dropdown
-   - [ ] Test delete application
+**Viktig:** Denne konfigurasjonen er kun for development/testing!
 
----
+- CORS tillater alle origins (kun i development)
+- Serveren lytter på alle nettverksgrensesnitt
+- Ikke bruk denne konfigurasjonen i produksjon!
 
-### AI Features
+## 📝 Notater
 
-10. **AI Cover Letter Generation**
-    - [ ] Gå til "AI Generate"
-    - [ ] Velg jobb fra dropdown
-    - [ ] Klikk "Generate Cover Letter"
-    - [ ] Skal generere cover letter
-    - [ ] Test "Copy to Clipboard"
-    
-    **Note:** Hvis OpenAI key ikke er satt, vil mock data vises
+- IP-adressen kan endre seg hvis du kobler til et annet nettverk
+- Hvis IP endrer seg, oppdater `frontend/.env` og restart frontend
+- Backend logger automatisk IP-adressen når den starter
 
-11. **Job Matching**
-    - [ ] På AI Generate side
-    - [ ] Velg jobb
-    - [ ] Skal vise match score
-    - [ ] Skal vise explanation
+## 🎯 Quick Reference
 
----
+**Backend:**
+- Lokalt: `http://localhost:3000/api`
+- Nettverk: `http://[IP]:3000/api`
 
-## 🐛 Vanlige Testing Issues
+**Frontend:**
+- Lokalt: `http://localhost:5173/JobCrawl/`
+- Nettverk: `http://[IP]:5173/JobCrawl/`
 
-### Backend starter ikke
-**Problem:** `Error: JWT_SECRET must be set`
-**Løsning:** Sjekk at `backend/env` har `JWT_SECRET`
-
-### Frontend kan ikke koble til backend
-**Problem:** Network error i browser
-**Løsning:** 
-1. Sjekk at backend kjører
-2. Sjekk `frontend/.env`
-3. Test med `npm run test:connection`
-
-### Email sendes ikke
-**Problem:** Ingen email mottatt
-**Løsning:**
-1. Test SMTP: `npm run test:smtp`
-2. Sjekk spam folder
-3. For development: Se backend konsoll for link
-
-### Database errors
-**Problem:** Prisma errors
-**Løsning:**
-1. Sjekk at database kjører
-2. Kjør migrations: `npm run db:migrate`
-3. Test med `npm run check-setup`
-
----
-
-## ✅ Test Status
-
-Etter testing, merk hva som fungerer:
-
-- [ ] Backend health endpoint
-- [ ] Frontend connection
-- [ ] SMTP configuration
-- [ ] Database connection
-- [ ] User registration
-- [ ] Email verification
-- [ ] Login
-- [ ] Profile update
-- [ ] CV upload/download/delete
-- [ ] Job browsing
-- [ ] Job details
-- [ ] Apply with AI cover letter
-- [ ] View applications
-- [ ] AI cover letter generation
-- [ ] Job matching
-
----
-
-**Tips:** Kjør test scripts først, så manuell testing. Dette identifiserer konfigurasjonsproblemer raskt!
-
+**Health Check:**
+- `http://[IP]:3000/api/health`

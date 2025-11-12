@@ -13,13 +13,28 @@ export const validateEmail = (email: string): { valid: boolean; error?: string }
   return { valid: true };
 };
 
-export const validatePassword = (password: string, minLength: number = 6): { valid: boolean; error?: string } => {
+export const validatePassword = (password: string, minLength: number = 8): { valid: boolean; error?: string } => {
   if (!password) {
     return { valid: false, error: 'Passord er påkrevd' };
   }
   
   if (password.length < minLength) {
     return { valid: false, error: `Passord må være minst ${minLength} tegn` };
+  }
+  
+  // Check for uppercase letter
+  if (!/[A-ZÆØÅ]/.test(password)) {
+    return { valid: false, error: 'Passord må inneholde minst én stor bokstav' };
+  }
+  
+  // Check for lowercase letter
+  if (!/[a-zæøå]/.test(password)) {
+    return { valid: false, error: 'Passord må inneholde minst én liten bokstav' };
+  }
+  
+  // Check for number
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, error: 'Passord må inneholde minst én tall' };
   }
   
   return { valid: true };

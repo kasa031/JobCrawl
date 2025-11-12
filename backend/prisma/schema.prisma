@@ -18,14 +18,18 @@ model User {
   fullName      String    @map("full_name")
   emailVerified Boolean   @default(false) @map("email_verified")
   emailVerificationToken String? @map("email_verification_token")
+  passwordResetToken String? @map("password_reset_token")
+  passwordResetExpiry DateTime? @map("password_reset_expiry")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
   
   profile       Profile?
   applications  Application[]
   favorites     Favorite[]
+  refreshTokens RefreshToken[]
   
   @@index([createdAt])
+  @@index([passwordResetToken])
   @@map("users")
 }
 
@@ -44,6 +48,7 @@ model Profile {
   bio           String?   @db.Text
   
   preferences   Json?     // Flexible preferences storage
+  emailNotificationsEnabled Boolean @default(true) @map("email_notifications_enabled")
   
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
@@ -75,6 +80,8 @@ model JobListing {
   @@index([location])
   @@index([publishedDate])
   @@index([title, company]) // Composite index for deduplication
+  // Note: Full-text search on description requires raw SQL migration
+  // Run: CREATE INDEX idx_job_listings_description_fts ON job_listings USING gin(to_tsvector('norwegian', description));
   @@map("job_listings")
 }
 
@@ -135,5 +142,20 @@ model Favorite {
   @@index([userId])
   @@index([createdAt])
   @@map("favorites")
+}
+
+// Refresh Tokens for JWT authentication
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
 }
 

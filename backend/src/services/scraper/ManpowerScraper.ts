@@ -193,9 +193,66 @@ export class ManpowerScraper extends BaseScraper {
         };
         
         const extractHref = (element: Element, selectorList: string[]): string => {
+          // First, try to find a link within the job element that looks like a job detail page
+          // Prefer links that contain job-specific identifiers
+          const allLinks = element.querySelectorAll('a[href]');
+          let bestLink = '';
+          
+          for (const link of Array.from(allLinks)) {
+            const href = (link as HTMLAnchorElement).href || '';
+            if (!href) continue;
+            
+            // Skip main listing pages
+            if (href.includes('/karriere/stillinger') || 
+                href === 'https://www.manpower.no/karriere/stillinger' ||
+                href.endsWith('/karriere/stillinger') ||
+                href.endsWith('/karriere')) {
+              continue;
+            }
+            
+            // Prefer links that look like job detail pages
+            // Check if it's a more specific path (more than just /karriere)
+            const pathParts = new URL(href).pathname.split('/').filter(p => p);
+            if (pathParts.length >= 3) { // e.g., /karriere/stilling/123 or /karriere/job/abc
+              // This looks like a specific job page
+              bestLink = href;
+              break;
+            } else if (href.includes('/stilling/') || 
+                      href.includes('/job/') ||
+                      href.match(/\/\d+/) || // Contains numbers (likely job ID)
+                      href.includes('?jobId=') ||
+                      href.includes('&jobId=')) {
+              bestLink = href;
+              break;
+            }
+          }
+          
+          // If we found a good link, use it
+          if (bestLink) return bestLink;
+          
+          // Fallback to original logic - but still filter out listing pages
           const found = trySelectors(element, selectorList);
-          if (found instanceof HTMLAnchorElement) return found.href || '';
-          if (element instanceof HTMLAnchorElement) return element.href || '';
+          if (found instanceof HTMLAnchorElement) {
+            const href = found.href || '';
+            // Don't use if it's the main listing page
+            if (href && 
+                !href.includes('/karriere/stillinger') && 
+                href !== 'https://www.manpower.no/karriere/stillinger' &&
+                !href.endsWith('/karriere/stillinger') &&
+                !href.endsWith('/karriere')) {
+              return href;
+            }
+          }
+          if (element instanceof HTMLAnchorElement) {
+            const href = element.href || '';
+            if (href && 
+                !href.includes('/karriere/stillinger') && 
+                href !== 'https://www.manpower.no/karriere/stillinger' &&
+                !href.endsWith('/karriere/stillinger') &&
+                !href.endsWith('/karriere')) {
+              return href;
+            }
+          }
           return '';
         };
 
@@ -263,14 +320,27 @@ export class ManpowerScraper extends BaseScraper {
                 }
               }
               
-              jobs.push({
-                title,
-                company: company || 'Manpower',
-                location,
-                url: absoluteUrl,
-                description,
-                requirements: [],
-              });
+              // Validate that URL is not the main listing page
+              // Only save jobs with valid, specific URLs
+              if (absoluteUrl && 
+                  absoluteUrl !== 'https://www.manpower.no/karriere/stillinger' &&
+                  !absoluteUrl.endsWith('/karriere/stillinger') &&
+                  !absoluteUrl.endsWith('/karriere') &&
+                  !absoluteUrl.includes('/karriere/stillinger')) {
+                // Additional check: URL should have a specific path (not just domain)
+                const urlPath = new URL(absoluteUrl).pathname;
+                const pathParts = urlPath.split('/').filter(p => p);
+                if (pathParts.length >= 2) { // At least /karriere/something
+                  jobs.push({
+                    title,
+                    company: company || 'Manpower',
+                    location,
+                    url: absoluteUrl,
+                    description,
+                    requirements: [],
+                  });
+                }
+              }
             }
           } catch (error) {
             // Ignore errors for individual jobs

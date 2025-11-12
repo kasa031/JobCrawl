@@ -53,8 +53,15 @@ export const rateLimiter = (req: Request, res: Response, next: NextFunction) => 
   const path = req.path || req.url || '';
   const now = Date.now();
   
+  // Get user ID if authenticated (for per-user rate limiting)
+  const authReq = req as any;
+  const userId = authReq.userId || null;
+  
   const limit = getRateLimit(path);
-  const key = `${ip}:${path}`;
+  
+  // Use user ID for authenticated requests, IP for anonymous requests
+  // This allows per-user rate limiting for authenticated endpoints
+  const key = userId ? `user:${userId}:${path}` : `ip:${ip}:${path}`;
 
   const record = requestCounts.get(key);
 
@@ -73,10 +80,12 @@ export const rateLimiter = (req: Request, res: Response, next: NextFunction) => 
     
     logWarn('Rate limit exceeded', {
       ip,
+      userId: userId || 'anonymous',
       path,
       count: record.count,
       max: limit.max,
       retryAfter,
+      type: userId ? 'per-user' : 'per-ip',
     });
     
     res.setHeader('Retry-After', retryAfter.toString());
@@ -85,7 +94,7 @@ export const rateLimiter = (req: Request, res: Response, next: NextFunction) => 
     res.setHeader('X-RateLimit-Reset', new Date(record.resetTime).toISOString());
     
     return res.status(429).json({
-      error: 'Too many requests. Please try again later.',
+      error: 'For mange forespørsler. Vennligst prøv igjen senere.',
       retryAfter,
       limit: limit.max,
       window: limit.window / 1000, // in seconds

@@ -32,32 +32,34 @@ class ErrorBoundary extends Component<Props, State> {
             <div className="text-center">
               <div className="text-6xl mb-4">😕</div>
               <h1 className="text-2xl font-bold text-dark-heading mb-4">
-                Something went wrong
+                Noe gikk galt
               </h1>
               <p className="text-dark-text mb-6">
-                We're sorry, but something unexpected happened. Please try refreshing the page.
+                Beklager, men noe uventet skjedde. Vennligst prøv å oppdatere siden.
               </p>
               <div className="space-y-3">
                 <button
                   onClick={() => window.location.reload()}
-                  className="w-full bg-mocca-400 text-white px-6 py-3 rounded-lg font-semibold hover:bg-mocca-500 transition-colors"
+                  className="w-full bg-mocca-400 text-white px-6 py-3 rounded-lg font-semibold hover:bg-mocca-500 transition-colors focus:outline-none focus:ring-2 focus:ring-mocca-400 focus:ring-offset-2"
+                  aria-label="Oppdater siden"
                 >
-                  Refresh Page
+                  Oppdater siden
                 </button>
                 <button
                   onClick={() => {
                     this.setState({ hasError: false, error: null });
                     window.location.href = '/';
                   }}
-                  className="w-full bg-mocca-200 text-dark-text px-6 py-3 rounded-lg font-semibold hover:bg-mocca-300 transition-colors"
+                  className="w-full bg-mocca-200 text-dark-text px-6 py-3 rounded-lg font-semibold hover:bg-mocca-300 transition-colors focus:outline-none focus:ring-2 focus:ring-mocca-400 focus:ring-offset-2"
+                  aria-label="Gå til hjemmesiden"
                 >
-                  Go to Home
+                  Gå til hjemmesiden
                 </button>
               </div>
               {import.meta.env.DEV && this.state.error && (
                 <details className="mt-6 text-left">
                   <summary className="cursor-pointer text-sm text-gray-600 mb-2">
-                    Error Details (Development Only)
+                    Feildetaljer (Kun i utviklingsmodus)
                   </summary>
                   <pre className="text-xs bg-gray-100 p-4 rounded overflow-auto max-h-40">
                     {this.state.error.toString()}

@@ -1,10 +1,12 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { Request } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import prisma from '../config/database';
 import { sendVerificationEmail } from '../config/email';
 import { logError, logInfo } from '../config/logger';
+import { AuthRequest } from '../middleware/auth';
 import {
   validateEmail,
   validatePassword,
@@ -18,6 +20,24 @@ if (!JWT_SECRET) {
   throw new Error('CRITICAL: JWT_SECRET must be set in environment variables. Server cannot start without it.');
 }
 
+// JWT token expiration times
+const ACCESS_TOKEN_EXPIRY = '15m'; // Short-lived access token
+const REFRESH_TOKEN_EXPIRY_DAYS = 30; // Long-lived refresh token
+
+// Helper function to generate refresh token
+const generateRefreshToken = (): string => {
+  return crypto.randomBytes(64).toString('hex');
+};
+
+// Helper function to create access token
+const createAccessToken = (userId: string, email: string): string => {
+  return jwt.sign(
+    { userId, email },
+    JWT_SECRET!,
+    { expiresIn: ACCESS_TOKEN_EXPIRY }
+  );
+};
+
 export const register = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const { email, password, fullName } = req.body;
@@ -26,7 +46,7 @@ export const register = async (req: Request, res: Response): Promise<Response | 
     const validation = validateRequiredFields(req.body, ['email', 'password', 'fullName']);
     if (!validation.isValid) {
       return res.status(400).json({ 
-        error: 'All fields are required',
+        error: 'Alle felt er påkrevd',
         missingFields: validation.missingFields,
       });
     }
@@ -34,18 +54,18 @@ export const register = async (req: Request, res: Response): Promise<Response | 
     // Sanitize and validate email
     const sanitizedEmail = sanitizeString(email, 255).toLowerCase();
     if (!validateEmail(sanitizedEmail)) {
-      return res.status(400).json({ error: 'Invalid email format' });
+      return res.status(400).json({ error: 'Ugyldig e-postformat' });
     }
 
     // Sanitize and validate full name
     const sanitizedFullName = sanitizeString(fullName, 100);
     if (!validateStringLength(sanitizedFullName, 2, 100)) {
-      return res.status(400).json({ error: 'Full name must be between 2 and 100 characters' });
+      return res.status(400).json({ error: 'Fullt navn må være mellom 2 og 100 tegn' });
     }
 
     // Validate password
     if (!validatePassword(password)) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+      return res.status(400).json({ error: 'Passord må være minst 8 tegn langt' });
     }
 
     if (password.length > 128) {
@@ -59,7 +79,7 @@ export const register = async (req: Request, res: Response): Promise<Response | 
 
     if (!hasUpperCase || !hasLowerCase || !hasNumber) {
       return res.status(400).json({ 
-        error: 'Password must contain at least one uppercase letter, one lowercase letter, and one number' 
+        error: 'Passord må inneholde minst én stor bokstav, én liten bokstav og ett tall' 
       });
     }
 
@@ -69,7 +89,7 @@ export const register = async (req: Request, res: Response): Promise<Response | 
     });
 
     if (existingUser) {
-      return res.status(409).json({ error: 'User already exists' });
+      return res.status(409).json({ error: 'En bruker med denne e-postadressen finnes allerede' });
     }
 
     // Hash password
@@ -110,7 +130,7 @@ export const register = async (req: Request, res: Response): Promise<Response | 
     });
   } catch (error) {
     logError('Registration error', error as Error, { email: req.body.email });
-    res.status(500).json({ error: 'Failed to register user' });
+    res.status(500).json({ error: 'Kunne ikke registrere bruker' });
   }
 };
 
@@ -163,7 +183,7 @@ export const login = async (req: Request, res: Response): Promise<Response | voi
     const validation = validateRequiredFields(req.body, ['email', 'password']);
     if (!validation.isValid) {
       return res.status(400).json({ 
-        error: 'Email and password are required',
+        error: 'E-post og passord er påkrevd',
         missingFields: validation.missingFields,
       });
     }
@@ -171,12 +191,12 @@ export const login = async (req: Request, res: Response): Promise<Response | voi
     // Sanitize and validate email
     const sanitizedEmail = sanitizeString(email, 255).toLowerCase();
     if (!validateEmail(sanitizedEmail)) {
-      return res.status(400).json({ error: 'Invalid email format' });
+      return res.status(400).json({ error: 'Ugyldig e-postformat' });
     }
 
     // Basic password length check
     if (password.length < 1 || password.length > 128) {
-      return res.status(400).json({ error: 'Invalid password format' });
+      return res.status(400).json({ error: 'Ugyldig passordformat' });
     }
 
     // Find user
@@ -185,13 +205,14 @@ export const login = async (req: Request, res: Response): Promise<Response | voi
     });
 
     if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      // Use generic message to prevent user enumeration
+      return res.status(401).json({ error: 'Ugyldig e-post eller passord' });
     }
 
     // Check if email is verified
     if (!user.emailVerified) {
       return res.status(403).json({ 
-        error: 'Please verify your email before logging in',
+        error: 'Vennligst verifiser e-posten din før innlogging. Sjekk innboksen din for verifiseringslenke.',
         requiresVerification: true 
       });
     }
@@ -200,17 +221,41 @@ export const login = async (req: Request, res: Response): Promise<Response | voi
     const validPassword = await bcrypt.compare(password, user.passwordHash);
 
     if (!validPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      // Use generic message to prevent user enumeration
+      return res.status(401).json({ error: 'Ugyldig e-post eller passord' });
     }
 
-    // Generate JWT
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    // Generate access token (short-lived)
+    const accessToken = createAccessToken(user.id, user.email);
+
+    // Generate and save refresh token (long-lived)
+    const refreshToken = generateRefreshToken();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRY_DAYS);
+
+    // Save refresh token to database
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        token: refreshToken,
+        expiresAt,
+      },
+    });
+
+    // Clean up expired refresh tokens for this user
+    await prisma.refreshToken.deleteMany({
+      where: {
+        userId: user.id,
+        expiresAt: { lt: new Date() },
+      },
+    });
 
     logInfo('User logged in', { userId: user.id, email: user.email });
 
     res.json({
       message: 'Login successful',
-      token,
+      token: accessToken, // Access token
+      refreshToken, // Refresh token
       user: {
         id: user.id,
         email: user.email,
@@ -221,7 +266,7 @@ export const login = async (req: Request, res: Response): Promise<Response | voi
     });
   } catch (error) {
     logError('Login error', error as Error, { email: req.body.email });
-    res.status(500).json({ error: 'Failed to login' });
+    res.status(500).json({ error: 'Kunne ikke logge inn' });
   }
 };
 
@@ -236,7 +281,7 @@ export const resendVerification = async (req: Request, res: Response): Promise<R
     // Email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({ error: 'Invalid email format' });
+      return res.status(400).json({ error: 'Ugyldig e-postformat' });
     }
 
     const user = await prisma.user.findUnique({
@@ -270,21 +315,69 @@ export const resendVerification = async (req: Request, res: Response): Promise<R
   }
 };
 
-export const getMe = async (req: Request, res: Response): Promise<Response | void> => {
+export const refreshToken = async (req: Request, res: Response): Promise<Response | void> => {
   try {
-    // Extract token from header
-    const token = req.headers.authorization?.replace('Bearer ', '');
+    const { refreshToken: token } = req.body;
 
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ error: 'Refresh token is required' });
     }
 
-    // Verify token
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    // Find refresh token in database
+    const refreshTokenRecord = await prisma.refreshToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+
+    if (!refreshTokenRecord) {
+      return res.status(401).json({ error: 'Ugyldig refresh token' });
+    }
+
+    // Check if token is expired
+    if (refreshTokenRecord.expiresAt < new Date()) {
+      // Delete expired token
+      await prisma.refreshToken.delete({
+        where: { id: refreshTokenRecord.id },
+      });
+      return res.status(401).json({ error: 'Refresh token har utløpt' });
+    }
+
+    // Check if user still exists and is verified
+    if (!refreshTokenRecord.user.emailVerified) {
+      return res.status(403).json({ error: 'Bruker er ikke verifisert' });
+    }
+
+    // Generate new access token
+    const accessToken = createAccessToken(
+      refreshTokenRecord.user.id,
+      refreshTokenRecord.user.email
+    );
+
+    logInfo('Token refreshed', { userId: refreshTokenRecord.user.id });
+
+    res.json({
+      message: 'Token refreshed successfully',
+      token: accessToken,
+      // Optionally rotate refresh token for better security
+      // For now, we keep the same refresh token
+    });
+  } catch (error) {
+    logError('Refresh token error', error as Error);
+    res.status(500).json({ error: 'Kunne ikke oppdatere token' });
+  }
+};
+
+export const getMe = async (req: AuthRequest, res: Response): Promise<Response | void> => {
+  try {
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     // Get user
     const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
+      where: { id: userId },
       select: {
         id: true,
         email: true,
@@ -301,7 +394,130 @@ export const getMe = async (req: Request, res: Response): Promise<Response | voi
 
     res.json({ user });
   } catch (error) {
-    logError('Get me error - invalid token', error as Error);
-    res.status(401).json({ error: 'Invalid token' });
+    logError('Get me error', error as Error, { userId: req.userId });
+    res.status(500).json({ error: 'Failed to get user' });
+  }
+};
+
+export const requestPasswordReset = async (req: Request, res: Response): Promise<Response | void> => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'E-post er påkrevd' });
+    }
+
+    const sanitizedEmail = sanitizeString(email, 255).toLowerCase();
+    if (!validateEmail(sanitizedEmail)) {
+      return res.status(400).json({ error: 'Ugyldig e-postformat' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: sanitizedEmail },
+    });
+
+    // Don't reveal if user exists (security best practice)
+    if (!user) {
+      // Still return success to prevent user enumeration
+      return res.json({ 
+        message: 'Hvis en bruker med denne e-postadressen finnes, vil du motta en e-post med instruksjoner for å tilbakestille passordet.' 
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date();
+    resetTokenExpiry.setHours(resetTokenExpiry.getHours() + 1); // Token valid for 1 hour
+
+    // Store reset token in user record
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken: resetToken,
+        passwordResetExpiry: resetTokenExpiry,
+      },
+    });
+
+    // Send password reset email
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/JobCrawl/reset-password?token=${resetToken}`;
+    
+    // Import and use email sending function
+    const { sendPasswordResetEmail } = await import('../config/email');
+    await sendPasswordResetEmail(sanitizedEmail, resetToken, user.fullName);
+
+    logInfo('Password reset requested', { email: sanitizedEmail, userId: user.id });
+
+    res.json({ 
+      message: 'Hvis en bruker med denne e-postadressen finnes, vil du motta en e-post med instruksjoner for å tilbakestille passordet.' 
+    });
+  } catch (error) {
+    logError('Request password reset error', error as Error, { email: req.body.email });
+    res.status(500).json({ error: 'Kunne ikke behandle forespørsel om passordtilbakestilling' });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response): Promise<Response | void> => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token og nytt passord er påkrevd' });
+    }
+
+    // Validate password
+    if (!validatePassword(newPassword)) {
+      return res.status(400).json({ error: 'Passord må være minst 8 tegn langt' });
+    }
+
+    if (newPassword.length > 128) {
+      return res.status(400).json({ error: 'Passord må være mindre enn 128 tegn' });
+    }
+
+    // Check for password requirements
+    const hasUpperCase = /[A-Z]/.test(newPassword);
+    const hasLowerCase = /[a-z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+
+    if (!hasUpperCase || !hasLowerCase || !hasNumber) {
+      return res.status(400).json({ 
+        error: 'Passord må inneholde minst én stor bokstav, én liten bokstav og ett tall' 
+      });
+    }
+
+    // Find user with this reset token
+    const user = await prisma.user.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetExpiry: {
+          gt: new Date(), // Token must not be expired
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Ugyldig eller utløpt tilbakestillingslenke' });
+    }
+
+    // Hash new password
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    // Update user password and clear reset token
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpiry: null,
+      },
+    });
+
+    logInfo('Password reset successful', { userId: user.id, email: user.email });
+
+    res.json({ 
+      message: 'Passordet ditt har blitt tilbakestilt. Du kan nå logge inn med ditt nye passord.' 
+    });
+  } catch (error) {
+    logError('Reset password error', error as Error);
+    res.status(500).json({ error: 'Kunne ikke tilbakestille passord' });
   }
 };

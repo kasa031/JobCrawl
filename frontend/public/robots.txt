@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# PWA files
+Allow: /JobCrawl/manifest.json
+Allow: /JobCrawl/sw.js
+Allow: /JobCrawl/icons/
+

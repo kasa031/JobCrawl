@@ -11,6 +11,8 @@ import { AIService } from '../services/ai/AIService';
 import { deduplicateJobs } from '../utils/deduplication';
 import { cacheService, CacheService } from '../services/cache/CacheService';
 import { jobNotificationService } from '../services/notification/JobNotificationService';
+import { validateKeywords, validateLocation } from '../utils/validation';
+import { validateUUID } from '../utils/validation';
 
 // Lazy initialization - AIService blir instantiert når den først brukes
 // Dette sikrer at dotenv.config() har kjørt først
@@ -49,6 +51,73 @@ export const getJobs = async (req: Request, res: Response) => {
     }
 
     if (search) {
+      // Try to use full-text search if index exists, otherwise fallback to contains
+      try {
+        // Check if full-text search index exists
+        const indexExists = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+          SELECT EXISTS (
+            SELECT 1 FROM pg_indexes 
+            WHERE tablename = 'job_listings' 
+            AND indexname = 'idx_job_listings_title_description_fts'
+          ) as exists
+        `;
+        
+        if (indexExists[0]?.exists) {
+          // Use full-text search - convert search terms to tsquery format
+          const searchTerms = search
+            .split(/\s+/)
+            .filter(t => t.length > 0)
+            .map(t => t.replace(/[^\wæøåÆØÅ]/g, '')) // Remove special chars
+            .filter(t => t.length > 0)
+            .join(' & '); // AND operator for all terms
+          
+          if (searchTerms) {
+            // Use raw SQL for full-text search
+            const ftsJobs = await prisma.$queryRaw<Array<{
+              id: string;
+              title: string;
+              company: string;
+              location: string;
+              url: string;
+              description: string | null;
+              requirements: string[] | null;
+              source: string;
+              publishedDate: Date | null;
+              scrapedAt: Date;
+            }>>`
+              SELECT * FROM job_listings
+              WHERE to_tsvector('norwegian', title || ' ' || COALESCE(description, '')) 
+                    @@ to_tsquery('norwegian', ${searchTerms})
+              ORDER BY ts_rank(
+                to_tsvector('norwegian', title || ' ' || COALESCE(description, '')), 
+                to_tsquery('norwegian', ${searchTerms})
+              ) DESC, scraped_at DESC
+              LIMIT ${limit} OFFSET ${skip}
+            `;
+            
+            const ftsTotal = await prisma.$queryRaw<Array<{ count: bigint }>>`
+              SELECT COUNT(*) as count FROM job_listings
+              WHERE to_tsvector('norwegian', title || ' ' || COALESCE(description, '')) 
+                    @@ to_tsquery('norwegian', ${searchTerms})
+            `;
+            
+            return res.json({
+              jobs: ftsJobs,
+              pagination: {
+                page,
+                limit,
+                total: Number(ftsTotal[0]?.count || 0),
+                pages: Math.ceil(Number(ftsTotal[0]?.count || 0) / limit),
+              },
+            });
+          }
+        }
+      } catch (ftsError) {
+        // If full-text search fails, log and fallback to contains
+        logError('Full-text search failed, using fallback', ftsError as Error);
+      }
+      
+      // Fallback to contains search (works without full-text index)
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
         { company: { contains: search, mode: 'insensitive' } },
@@ -89,9 +158,9 @@ export const getJobById = async (req: Request, res: Response): Promise<Response 
   try {
     const { id } = req.params;
 
-    // Validate UUID format (basic check)
-    if (!id || typeof id !== 'string' || id.length > 100) {
-      return res.status(400).json({ error: 'Invalid job ID format' });
+    // Validate UUID format
+    if (!id || typeof id !== 'string' || !validateUUID(id)) {
+      return res.status(400).json({ error: 'Invalid job ID format. Must be a valid UUID.' });
     }
 
     const job = await prisma.jobListing.findUnique({
@@ -114,10 +183,14 @@ export const refreshJobs = async (req: Request, res: Response): Promise<Response
   const startTime = Date.now();
   try {
     // Get optional search filters from request body (POST) or query params (fallback)
-    const keywords = (typeof req.body?.q === 'string' ? req.body.q : undefined) ||
-                     (typeof req.query.q === 'string' ? req.query.q : undefined);
-    const location = (typeof req.body?.location === 'string' ? req.body.location : undefined) ||
-                     (typeof req.query.location === 'string' ? req.query.location : undefined);
+    // Validate and sanitize inputs
+    const rawKeywords = (typeof req.body?.q === 'string' ? req.body.q : undefined) ||
+                        (typeof req.query.q === 'string' ? req.query.q : undefined);
+    const rawLocation = (typeof req.body?.location === 'string' ? req.body.location : undefined) ||
+                       (typeof req.query.location === 'string' ? req.query.location : undefined);
+    
+    const keywords = validateKeywords(rawKeywords);
+    const location = validateLocation(rawLocation);
     
     // Check cache first
     const cacheKey = CacheService.createJobSearchKey(keywords, location);

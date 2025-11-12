@@ -19,11 +19,21 @@ env
 */env
 backend/env
 frontend/env
-# API keys og sensitive data
+# API keys og sensitive data - STRENGE REGLER
 *_API_KEY*
 *_SECRET*
 *_PASSWORD*
 *_TOKEN*
+# Spesifikke API key patterns
+sk-proj-*
+sk-or-v1-*
+sk-*
+# Database URLs med passord
+*DATABASE_URL*
+# SMTP credentials
+*SMTP_*
+# JWT secrets
+*JWT_SECRET*
 
 # IDE
 .vscode/
@@ -55,4 +65,7 @@ coverage/
 .cache/
 temp/
 tmp/
+
+# Cursor AI rules (may contain project-specific config)
+.cursorrules
 

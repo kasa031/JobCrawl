@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from './Toast';
 import { validateEmail, validatePassword, validateName } from '../utils/validation';
+import { authAPI } from '../services/api';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -19,24 +20,34 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [errors, setErrors] = useState<{ email?: string; password?: string; fullName?: string }>({});
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
 
   const validateForm = (): boolean => {
     const newErrors: { email?: string; password?: string; fullName?: string } = {};
     
+    // Always validate email
     const emailValidation = validateEmail(email);
     if (!emailValidation.valid) {
       newErrors.email = emailValidation.error;
     }
     
-    const passwordValidation = validatePassword(password);
-    if (!passwordValidation.valid) {
-      newErrors.password = passwordValidation.error;
-    }
-    
+    // Only validate password complexity when registering
+    // For login, just check if password is not empty
     if (isRegistering) {
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.valid) {
+        newErrors.password = passwordValidation.error;
+      }
+      
+      // Validate full name when registering
       const nameValidation = validateName(fullName);
       if (!nameValidation.valid) {
         newErrors.fullName = nameValidation.error;
+      }
+    } else {
+      // For login, just check if password is provided
+      if (!password || password.trim().length === 0) {
+        newErrors.password = 'Passord er påkrevd';
       }
     }
     
@@ -66,13 +77,39 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
         // Switch to login mode
         setIsRegistering(false);
       } else {
-        await login(email, password);
+        await login(email, password, rememberMe);
         showToast('Innlogging vellykket!', 'success');
         onClose();
       }
     } catch (err: any) {
-      const errorMsg = err.response?.data?.error || 'Noe gikk galt';
-      setErrors({ email: errorMsg });
+      let errorMsg = 'Noe gikk galt';
+      let errorField: 'email' | 'password' | 'fullName' = 'email';
+      
+      if (err.response?.data?.error) {
+        errorMsg = err.response.data.error;
+        
+        // Map specific errors to appropriate fields
+        if (errorMsg.toLowerCase().includes('password') || errorMsg.toLowerCase().includes('passord')) {
+          errorField = 'password';
+        } else if (errorMsg.toLowerCase().includes('name') || errorMsg.toLowerCase().includes('navn')) {
+          errorField = 'fullName';
+        } else if (errorMsg.toLowerCase().includes('email') || errorMsg.toLowerCase().includes('e-post')) {
+          errorField = 'email';
+        }
+        
+        // Handle specific error cases
+        if (errorMsg.includes('verify your email') || errorMsg.includes('verifiser')) {
+          errorMsg = 'Vennligst verifiser e-posten din før innlogging. Sjekk innboksen din for verifiseringslenke.';
+        } else if (errorMsg.includes('Invalid credentials') || errorMsg.includes('Ugyldig')) {
+          errorMsg = 'Ugyldig e-post eller passord. Prøv igjen.';
+        } else if (errorMsg.includes('User already exists') || errorMsg.includes('finnes allerede')) {
+          errorMsg = 'En bruker med denne e-postadressen finnes allerede.';
+        }
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      
+      setErrors({ [errorField]: errorMsg });
       showToast(errorMsg, 'error');
     } finally {
       setLoading(false);
@@ -195,9 +232,48 @@ function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   <p className="text-red-600 text-sm mt-1">{errors.password}</p>
                 )}
                 {isRegistering && !errors.password && (
-                  <p className="text-dark-secondary text-xs mt-1">Minimum 6 tegn</p>
+                  <p className="text-dark-secondary text-xs mt-1">
+                    Minimum 8 tegn, må inneholde stor bokstav, liten bokstav og tall
+                  </p>
                 )}
               </div>
+
+              {!isRegistering && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="rememberMe"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        className="w-4 h-4 text-mocca-400 rounded focus:ring-mocca-400 focus:ring-2"
+                      />
+                      <label htmlFor="rememberMe" className="ml-2 text-dark-text text-sm cursor-pointer">
+                        Husk meg
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!email) {
+                          showToast('Vennligst skriv inn e-postadressen din først', 'info');
+                          return;
+                        }
+                        try {
+                          await authAPI.requestPasswordReset(email);
+                          showToast('Hvis en bruker med denne e-postadressen finnes, vil du motta en e-post med instruksjoner.', 'success');
+                        } catch (err: any) {
+                          showToast(err.response?.data?.error || 'Kunne ikke sende passordtilbakestilling', 'error');
+                        }
+                      }}
+                      className="text-mocca-600 hover:text-mocca-700 text-sm underline"
+                    >
+                      Glemt passord?
+                    </button>
+                  </div>
+                </>
+              )}
 
               <div className="flex gap-4">
                 <button

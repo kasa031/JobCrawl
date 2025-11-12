@@ -2,6 +2,7 @@ import { Response } from 'express';
 import prisma from '../config/database';
 import { AuthRequest } from '../middleware/auth';
 import { logError, logInfo } from '../config/logger';
+import { validateUUID } from '../utils/validation';
 
 export const getApplications = async (req: AuthRequest, res: Response): Promise<Response | void> => {
   try {
@@ -35,8 +36,8 @@ export const createApplication = async (req: AuthRequest, res: Response): Promis
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    if (!jobListingId || typeof jobListingId !== 'string' || jobListingId.length > 100) {
-      return res.status(400).json({ error: 'Valid job listing ID is required' });
+    if (!jobListingId || typeof jobListingId !== 'string' || !validateUUID(jobListingId)) {
+      return res.status(400).json({ error: 'Valid job listing ID (UUID) is required' });
     }
 
     // Validate status enum
@@ -93,6 +94,41 @@ export const createApplication = async (req: AuthRequest, res: Response): Promis
   }
 };
 
+export const getApplication = async (req: AuthRequest, res: Response): Promise<Response | void> => {
+  try {
+    const userId = req.userId;
+    const { id } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!id || !validateUUID(id)) {
+      return res.status(400).json({ error: 'Valid application ID (UUID) is required' });
+    }
+
+    const application = await prisma.application.findFirst({
+      where: {
+        id,
+        userId, // Ensure user can only access their own applications
+      },
+      include: {
+        jobListing: true,
+      },
+    });
+
+    if (!application) {
+      return res.status(404).json({ error: 'Application not found' });
+    }
+
+    logInfo('Application retrieved', { userId: req.userId, applicationId: id });
+    res.json({ application });
+  } catch (error) {
+    logError('Get application error', error as Error, { userId: req.userId, applicationId: req.params.id });
+    res.status(500).json({ error: 'Failed to get application' });
+  }
+};
+
 export const updateApplication = async (req: AuthRequest, res: Response): Promise<Response | void> => {
   try {
     const userId = req.userId;
@@ -104,8 +140,8 @@ export const updateApplication = async (req: AuthRequest, res: Response): Promis
     }
 
     // Validate application ID
-    if (!id || typeof id !== 'string' || id.length > 100) {
-      return res.status(400).json({ error: 'Invalid application ID format' });
+    if (!id || typeof id !== 'string' || !validateUUID(id)) {
+      return res.status(400).json({ error: 'Invalid application ID format. Must be a valid UUID.' });
     }
 
     // Validate status enum if provided
@@ -194,8 +230,8 @@ export const deleteApplication = async (req: AuthRequest, res: Response): Promis
     }
 
     // Validate application ID
-    if (!id || typeof id !== 'string' || id.length > 100) {
-      return res.status(400).json({ error: 'Invalid application ID format' });
+    if (!id || typeof id !== 'string' || !validateUUID(id)) {
+      return res.status(400).json({ error: 'Invalid application ID format. Must be a valid UUID.' });
     }
 
     // Check if application exists and belongs to user
@@ -237,9 +273,9 @@ export const bulkDeleteApplications = async (req: AuthRequest, res: Response): P
       return res.status(400).json({ error: 'Array of application IDs is required' });
     }
 
-    // Validate all IDs are strings
-    if (!ids.every((id: any) => typeof id === 'string')) {
-      return res.status(400).json({ error: 'All IDs must be strings' });
+    // Validate all IDs are valid UUIDs
+    if (!ids.every((id: any) => typeof id === 'string' && validateUUID(id))) {
+      return res.status(400).json({ error: 'All IDs must be valid UUIDs' });
     }
 
     // Check if all applications exist and belong to user
@@ -289,9 +325,9 @@ export const bulkUpdateApplicationStatus = async (req: AuthRequest, res: Respons
       return res.status(400).json({ error: `Valid status is required. Must be one of: ${validStatuses.join(', ')}` });
     }
 
-    // Validate all IDs are strings
-    if (!ids.every((id: any) => typeof id === 'string')) {
-      return res.status(400).json({ error: 'All IDs must be strings' });
+    // Validate all IDs are valid UUIDs
+    if (!ids.every((id: any) => typeof id === 'string' && validateUUID(id))) {
+      return res.status(400).json({ error: 'All IDs must be valid UUIDs' });
     }
 
     // Check if all applications exist and belong to user

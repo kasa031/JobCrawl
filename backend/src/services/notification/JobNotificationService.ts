@@ -44,7 +44,9 @@ class JobNotificationService {
       const users = await prisma.user.findMany({
         where: {
           emailVerified: true,
-          // TODO: Add emailNotificationsEnabled field to Profile if needed
+          profile: {
+            emailNotificationsEnabled: true,
+          },
         },
         include: {
           profile: true,

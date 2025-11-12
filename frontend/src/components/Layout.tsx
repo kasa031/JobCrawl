@@ -2,6 +2,8 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import LoginModal from './LoginModal';
+import OfflineIndicator from './OfflineIndicator';
+import InstallPrompt from './InstallPrompt';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
@@ -16,6 +18,10 @@ function Layout() {
     { path: '/jobs', label: 'Jobs' },
     { path: '/ai-generate', label: 'AI Generate' },
     { path: '/applications', label: 'Applications' },
+    { path: '/dashboard', label: 'Dashboard' },
+    { path: '/analytics', label: 'Analytics' },
+    { path: '/scheduler', label: 'Scheduler' },
+    { path: '/settings', label: 'Settings' },
     { path: '/profile', label: 'My Profile' },
     { path: '/about', label: 'Om meg' },
   ];
@@ -37,6 +43,9 @@ function Layout() {
 
   return (
     <div className="min-h-screen bg-mocca-50 dark:bg-gray-900 transition-colors duration-300">
+      {/* Offline Indicator */}
+      <OfflineIndicator />
+      
       {/* Header */}
       <header className="bg-mocca-100 dark:bg-gray-800 shadow-md relative transition-colors duration-300">
         <div className="container mx-auto px-4 py-4">
@@ -163,6 +172,9 @@ function Layout() {
 
       {/* Login Modal */}
       <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
+      
+      {/* Install Prompt */}
+      <InstallPrompt />
     </div>
   );
 }

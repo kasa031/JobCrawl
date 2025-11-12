@@ -337,29 +337,28 @@ export class ScraperService {
         url: config.baseUrl 
       });
       
-      // Debug: Hvis ingen jobber funnet, log HTML-struktur og prøv å finne hva som faktisk finnes
-      // VIKTIG: Gjør dette FØR vi lukker siden!
-      if (jobs.length === 0) {
+      // Log diagnostic info if no jobs found (only in development or when explicitly enabled)
+      if (jobs.length === 0 && (process.env.NODE_ENV === 'development' || process.env.ENABLE_SCRAPER_DEBUG === 'true')) {
         logWarn(`No jobs found from ${config.name}`, { 
           scraper: config.name,
           selector: config.selectors.jobList,
           url: config.baseUrl 
         });
         
-        // Debug: Hent page title og en liten del av HTML-en for å se hva som faktisk er der
+        // Collect diagnostic information
         try {
           const pageTitle = await page.title();
           const pageContent = await page.content();
           const contentLength = pageContent.length;
           
-          // Sjekk om siden inneholder noen jobb-relaterte keywords
+          // Check if page contains job-related keywords
           const lowerContent = pageContent.toLowerCase();
           const hasJobKeywords = lowerContent.includes('stilling') || 
                                  lowerContent.includes('jobb') ||
                                  lowerContent.includes('søk') ||
                                  lowerContent.includes('annonse');
           
-          // Prøv å finne alle article-elementer
+          // Try to find article elements
           const articleCount = await page.evaluate(() => {
             return document.querySelectorAll('article').length;
           });
@@ -368,7 +367,7 @@ export class ScraperService {
                            lowerContent.includes('bot') || 
                            lowerContent.includes('blocked');
           
-          logWarn(`Debug info for ${config.name}`, {
+          logWarn(`Scraper diagnostic info for ${config.name}`, {
             scraper: config.name,
             pageTitle,
             contentLength,
@@ -376,9 +375,15 @@ export class ScraperService {
             articleCount,
             isBlocked,
           });
-        } catch (debugError: any) {
-          logError(`Debug error for ${config.name}`, debugError, { scraper: config.name });
+        } catch (debugError: unknown) {
+          logError(`Error collecting diagnostic info for ${config.name}`, debugError as Error, { scraper: config.name });
         }
+      } else if (jobs.length === 0) {
+        // In production, just log a simple warning
+        logWarn(`No jobs found from ${config.name}`, { 
+          scraper: config.name,
+          url: config.baseUrl 
+        });
       }
 
       await page.close();

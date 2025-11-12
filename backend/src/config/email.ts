@@ -106,9 +106,11 @@ export const sendVerificationEmail = async (
   
   // Log that email was sent (but NOT the token for security)
   if (process.env.NODE_ENV === 'development') {
-    console.log(`\n📧 Verification email sent to: ${email}`);
-    console.log(`   E-post sendes til MailHog (http://127.0.0.1:8025)`);
-    console.log(`   Sjekk MailHog UI for verifiseringslenken\n`);
+    logInfo('Verification email would be sent', {
+      email,
+      mailhogUrl: 'http://127.0.0.1:8025',
+      note: 'E-post sendes til MailHog - sjekk MailHog UI for verifiseringslenken',
+    });
   }
 
   const { primary, secondary } = selectProviderForEmail(email);
@@ -147,12 +149,12 @@ The JobCrawl Team
   };
 
   try {
-    console.log(`\n🔍 Attempting to send email to ${email}`);
-    console.log(`   Using SMTP: ${primary.host}:${primary.port}`);
+    logInfo('Attempting to send verification email', {
+      email,
+      smtpHost: primary.host,
+      smtpPort: primary.port,
+    });
     const info = await createTransporter(primary).sendMail(mailOptions);
-    console.log(`✅ Verification email sent to ${email} via ${primary.host}:${primary.port}`);
-    console.log(`📧 Message ID: ${info.messageId}`);
-    console.log(`📧 Response: ${JSON.stringify(info.response || 'No response')}`);
     logInfo('Verification email sent', {
       email,
       messageId: info.messageId,
@@ -161,20 +163,99 @@ The JobCrawl Team
       response: info.response,
     });
   } catch (error: any) {
-    console.error('❌ Primary SMTP failed:', error?.message || error);
+    logError('Primary SMTP failed', error as Error, { email, smtpHost: primary.host });
     // Try secondary as fallback
     try {
       const info2 = await createTransporter(secondary).sendMail(mailOptions);
-      console.log(`✅ Fallback email sent to ${email} via ${secondary.host}:${secondary.port}`);
-      console.log(`📧 Message ID: ${info2.messageId}`);
       logInfo('Verification email sent (fallback)', {
+        email,
+        messageId: info2.messageId,
+        smtpHost: secondary.host,
+        smtpPort: secondary.port,
+      });
+    } catch (error2: any) {
+      logError('Failed to send verification email (primary and fallback)', error2 as Error, {
+        email,
+        primaryHost: primary.host,
+        secondaryHost: secondary.host,
+      });
+      // Don't throw - allow development without email setup
+    }
+  }
+};
+
+export const sendPasswordResetEmail = async (
+  email: string,
+  token: string,
+  fullName: string
+): Promise<void> => {
+  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/JobCrawl/reset-password?token=${token}`;
+  
+  if (process.env.NODE_ENV === 'development') {
+    logInfo('Password reset email would be sent', {
+      email,
+      resetUrl,
+      note: 'E-post sendes til MailHog i development mode',
+    });
+  }
+
+  const { primary, secondary } = selectProviderForEmail(email);
+
+  const mailOptions = {
+    from: primary.from || 'noreply@jobcrawl.local',
+    to: email,
+    subject: 'Tilbakestill passordet ditt - JobCrawl',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #FAF5F0; padding: 20px;">
+        <div style="background-color: #F5ECE2; padding: 20px; border-radius: 8px; border: 1px solid #E8D5C1;">
+          <h1 style="color: #2A2018; margin-top: 0;">Tilbakestill passordet ditt</h1>
+          <p style="color: #3D2F1F;">Hei ${fullName},</p>
+          <p style="color: #3D2F1F;">Vi har mottatt en forespørsel om å tilbakestille passordet ditt. Klikk på knappen under for å velge et nytt passord:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetUrl}" style="background-color: #C29B73; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">Tilbakestill passord</a>
+          </div>
+          <p style="color: #6B5439; font-size: 14px;">Hvis knappen ikke fungerer, kopier og lim inn denne lenken i nettleseren din:</p>
+          <p style="color: #8B6B47; font-size: 12px; word-break: break-all;">${resetUrl}</p>
+          <p style="color: #6B5439; font-size: 12px; margin-top: 30px;">Denne lenken utløper om 1 time.</p>
+          <p style="color: #6B5439; font-size: 12px;">Hvis du ikke ba om å tilbakestille passordet, kan du trygt ignorere denne e-posten.</p>
+        </div>
+      </div>
+    `,
+    text: `
+Hei ${fullName},
+
+Vi har mottatt en forespørsel om å tilbakestille passordet ditt for JobCrawl-kontoen din.
+
+Klikk på lenken under for å velge et nytt passord:
+${resetUrl}
+
+Denne lenken utløper om 1 time.
+
+Hvis du ikke ba om å tilbakestille passordet, kan du trygt ignorere denne e-posten.
+
+Med vennlig hilsen,
+JobCrawl-teamet
+    `,
+  };
+
+  try {
+    const info = await createTransporter(primary).sendMail(mailOptions);
+    logInfo('Password reset email sent', {
+      email,
+      messageId: info.messageId,
+      smtpHost: primary.host,
+    });
+  } catch (error: any) {
+    logError('Primary SMTP failed for password reset', error as Error, { email, smtpHost: primary.host });
+    try {
+      const info2 = await createTransporter(secondary).sendMail(mailOptions);
+      logInfo('Password reset email sent (fallback)', {
         email,
         messageId: info2.messageId,
         smtpHost: secondary.host,
       });
     } catch (error2: any) {
-      console.error('❌ Fallback SMTP failed:', error2?.message || error2);
-      logError('Failed to send verification email (primary and fallback)', error2, {
+      logError('Failed to send password reset email (primary and fallback)', error2 as Error, {
         email,
         primaryHost: primary.host,
         secondaryHost: secondary.host,

@@ -7,6 +7,7 @@ import { KarriereScraper } from '../scraper/KarriereScraper';
 import { deduplicateJobs } from '../../utils/deduplication';
 import prisma from '../../config/database';
 import { ScrapedJob } from '../scraper/ScraperService';
+import { jobNotificationService } from '../notification/JobNotificationService';
 
 /**
  * Simple scheduler service for running periodic scraping jobs
@@ -152,6 +153,7 @@ class SchedulerService {
       // Save to database
       let savedCount = 0;
       let newJobsCount = 0;
+      const newJobIds: string[] = [];
 
       for (const job of uniqueJobs) {
         try {
@@ -163,7 +165,7 @@ class SchedulerService {
           const isNew = !existing;
 
           // Use upsert
-          await prisma.jobListing.upsert({
+          const savedJob = await prisma.jobListing.upsert({
             where: { url: job.url },
             update: {
               title: job.title,
@@ -190,11 +192,26 @@ class SchedulerService {
           savedCount++;
           if (isNew) {
             newJobsCount++;
+            newJobIds.push(savedJob.id);
           }
         } catch (error) {
           logError('Error saving individual job in scheduled scrape', error as Error, {
             jobUrl: job.url,
             jobTitle: job.title,
+          });
+        }
+      }
+
+      // Send notifications about new jobs
+      if (newJobIds.length > 0) {
+        try {
+          logInfo('Sending notifications about new jobs', { newJobsCount: newJobIds.length });
+          await jobNotificationService.notifyUsersAboutNewJobs(newJobIds);
+          logInfo('Job notifications sent successfully', { notifiedJobsCount: newJobIds.length });
+        } catch (error) {
+          // Don't fail the entire scraping job if notifications fail
+          logError('Error sending job notifications', error as Error, {
+            newJobsCount: newJobIds.length,
           });
         }
       }

@@ -4,6 +4,7 @@ import { CVService } from '../services/cv/CVService';
 import prisma from '../config/database';
 import { AuthRequest } from '../middleware/auth';
 import { logError, logInfo } from '../config/logger';
+import { validateUUID } from '../utils/validation';
 
 // Lazy initialization - AIService blir instantiert når den først brukes
 // Dette sikrer at dotenv.config() har kjørt først
@@ -111,8 +112,8 @@ export const generateCoverLetter = async (req: AuthRequest, res: Response): Prom
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    if (!jobId) {
-      return res.status(400).json({ error: 'Job ID is required' });
+    if (!jobId || typeof jobId !== 'string' || !validateUUID(jobId)) {
+      return res.status(400).json({ error: 'Valid job ID (UUID) is required' });
     }
 
     // Fetch job and user data from database
@@ -212,8 +213,8 @@ export const matchJob = async (req: AuthRequest, res: Response): Promise<Respons
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    if (!jobId) {
-      return res.status(400).json({ error: 'Job ID is required' });
+    if (!jobId || typeof jobId !== 'string' || !validateUUID(jobId)) {
+      return res.status(400).json({ error: 'Valid job ID (UUID) is required' });
     }
 
     // Fetch job and user data from database

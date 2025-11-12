@@ -12,7 +12,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   register: (email: string, password: string, fullName: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -29,14 +29,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
+      // Check both localStorage and sessionStorage for token
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       if (token) {
         try {
           const data = await authAPI.getMe();
           setUser(data.user);
           setIsAuthenticated(true);
         } catch (error) {
+          // Token is invalid, clear both storages
           localStorage.removeItem('token');
+          sessionStorage.removeItem('token');
           setUser(null);
           setIsAuthenticated(false);
         }
@@ -45,8 +48,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     checkAuth();
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, rememberMe: boolean = false) => {
     const data = await authAPI.login(email, password);
+    
+    // Store tokens
+    if (data.token) {
+      if (rememberMe) {
+        // Store in localStorage (persists across sessions)
+        localStorage.setItem('token', data.token);
+        if (data.refreshToken) {
+          localStorage.setItem('refreshToken', data.refreshToken);
+        }
+      } else {
+        // Store in sessionStorage (cleared when browser closes)
+        sessionStorage.setItem('token', data.token);
+        if (data.refreshToken) {
+          sessionStorage.setItem('refreshToken', data.refreshToken);
+        }
+        localStorage.removeItem('token'); // Remove any existing token
+        localStorage.removeItem('refreshToken');
+      }
+    }
+    
     setUser(data.user);
     setIsAuthenticated(true);
     setShowLoginModal(false);
@@ -64,13 +87,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
-    authAPI.logout();
+    // Clear both localStorage and sessionStorage
+    localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('refreshToken');
     setUser(null);
     setIsAuthenticated(false);
   };
 
   const refreshUser = async () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (token) {
       try {
         const data = await authAPI.getMe();
@@ -78,6 +105,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setIsAuthenticated(true);
       } catch (error) {
         localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
         setUser(null);
         setIsAuthenticated(false);
       }

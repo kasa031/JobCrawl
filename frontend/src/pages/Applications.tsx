@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { applicationsAPI } from '../services/api';
 import LoginModal from '../components/LoginModal';
 import { useToast } from '../components/Toast';
 import { Skeleton } from '../components/Skeleton';
 import jobOfferMail from '../assets/images/joboffermail.png';
-import { exportToPDF, exportToWord } from '../utils/exportUtils';
+import { exportToPDF, exportToWord, exportToCSV, exportToJSON, exportBulkToPDF } from '../utils/exportUtils';
 
 export interface Application {
   id: string;
@@ -53,6 +54,7 @@ type SortOption = 'newest' | 'oldest' | 'company' | 'status';
 function Applications() {
   const { isAuthenticated, showLoginModal, setShowLoginModal, user } = useAuth();
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -97,7 +99,6 @@ function Applications() {
       setApplications(response.applications || []);
       setError('');
     } catch (err: any) {
-      console.error('Error loading applications:', err);
       const errorMsg = err.response?.data?.error || 'Kunne ikke laste søknader';
       setError(errorMsg);
       showToast(errorMsg, 'error');
@@ -136,6 +137,31 @@ function Applications() {
       showToast('Word-dokument eksportert!', 'success');
     } catch (error: any) {
       showToast('Kunne ikke eksportere til Word', 'error');
+    }
+  };
+
+  const handleBulkExportCSV = () => {
+    if (selectedApplications.size === 0) return;
+    const selected = filteredAndSortedApplications.filter(app => selectedApplications.has(app.id));
+    exportToCSV(selected, user?.fullName);
+    showToast(`${selected.length} søknader eksportert til CSV!`, 'success');
+  };
+
+  const handleBulkExportJSON = () => {
+    if (selectedApplications.size === 0) return;
+    const selected = filteredAndSortedApplications.filter(app => selectedApplications.has(app.id));
+    exportToJSON(selected, user?.fullName);
+    showToast(`${selected.length} søknader eksportert til JSON!`, 'success');
+  };
+
+  const handleBulkExportPDF = async () => {
+    if (selectedApplications.size === 0) return;
+    try {
+      const selected = filteredAndSortedApplications.filter(app => selectedApplications.has(app.id));
+      await exportBulkToPDF(selected, user?.fullName);
+      showToast(`${selected.length} søknader eksportert til PDF!`, 'success');
+    } catch (error: any) {
+      showToast('Kunne ikke eksportere til PDF', 'error');
     }
   };
 
@@ -355,6 +381,50 @@ function Applications() {
                     </div>
                   )}
                 </div>
+                <div className="relative">
+                  <button
+                    onClick={() => setExportMenuOpen(exportMenuOpen === 'bulk' ? null : 'bulk')}
+                    className="bg-green-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-600 transition-colors text-sm flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-green-400"
+                    aria-label="Eksporter valgte"
+                    aria-expanded={exportMenuOpen === 'bulk'}
+                  >
+                    📥 Eksporter valgte
+                    <svg className={`w-4 h-4 transition-transform ${exportMenuOpen === 'bulk' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {exportMenuOpen === 'bulk' && (
+                    <div className="absolute left-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-green-200 dark:border-gray-700 overflow-hidden z-10 min-w-[150px]">
+                      <button
+                        onClick={() => {
+                          handleBulkExportPDF();
+                          setExportMenuOpen(null);
+                        }}
+                        className="w-full text-left px-4 py-2 text-dark-text dark:text-gray-100 hover:bg-green-100 dark:hover:bg-gray-700 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                      >
+                        📄 PDF
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleBulkExportCSV();
+                          setExportMenuOpen(null);
+                        }}
+                        className="w-full text-left px-4 py-2 text-dark-text dark:text-gray-100 hover:bg-green-100 dark:hover:bg-gray-700 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                      >
+                        📊 CSV
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleBulkExportJSON();
+                          setExportMenuOpen(null);
+                        }}
+                        className="w-full text-left px-4 py-2 text-dark-text dark:text-gray-100 hover:bg-green-100 dark:hover:bg-gray-700 transition-colors text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                      >
+                        📋 JSON
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </motion.div>
@@ -538,11 +608,17 @@ function Applications() {
                     </div>
                   </div>
                   <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={() => navigate(`/applications/${application.id}`)}
+                      className="bg-mocca-400 text-white px-4 py-2 rounded-lg font-semibold hover:bg-mocca-500 transition-colors text-sm"
+                    >
+                      Se detaljer
+                    </button>
                     <a
                       href={application.jobListing.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="bg-mocca-400 text-white px-4 py-2 rounded-lg font-semibold hover:bg-mocca-500 transition-colors text-sm"
+                      className="bg-blue-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-600 transition-colors text-sm"
                     >
                       Se stilling
                     </a>

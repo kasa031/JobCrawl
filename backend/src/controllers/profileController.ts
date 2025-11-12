@@ -35,7 +35,7 @@ export const getProfile = async (req: AuthRequest, res: Response): Promise<Respo
 export const updateProfile = async (req: AuthRequest, res: Response): Promise<Response | void> => {
   try {
     const userId = req.userId;
-    const { fullName, skills, experience, education, location, bio, phone, preferences } = req.body;
+    const { fullName, skills, experience, education, location, bio, phone, preferences, emailNotificationsEnabled } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -76,6 +76,11 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<Re
       }
     }
 
+    // Validate emailNotificationsEnabled
+    const validEmailNotificationsEnabled = typeof emailNotificationsEnabled === 'boolean' 
+      ? emailNotificationsEnabled 
+      : undefined;
+
     const profile = await prisma.profile.upsert({
       where: { userId },
       update: {
@@ -86,6 +91,7 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<Re
         bio: validBio,
         phone: validPhone,
         preferences: validPreferences,
+        ...(validEmailNotificationsEnabled !== undefined && { emailNotificationsEnabled: validEmailNotificationsEnabled }),
       },
       create: {
         userId,
@@ -96,6 +102,7 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<Re
         bio: validBio,
         phone: validPhone,
         preferences: validPreferences,
+        emailNotificationsEnabled: validEmailNotificationsEnabled ?? true, // Default to true
       },
     });
 

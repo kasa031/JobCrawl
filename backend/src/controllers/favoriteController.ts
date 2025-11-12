@@ -2,6 +2,7 @@ import { Response } from 'express';
 import prisma from '../config/database';
 import { AuthRequest } from '../middleware/auth';
 import { logError, logInfo } from '../config/logger';
+import { validateUUID } from '../utils/validation';
 
 export const getFavorites = async (req: AuthRequest, res: Response): Promise<Response | void> => {
   try {
@@ -35,8 +36,8 @@ export const addFavorite = async (req: AuthRequest, res: Response): Promise<Resp
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    if (!jobListingId || typeof jobListingId !== 'string') {
-      return res.status(400).json({ error: 'Valid job listing ID is required' });
+    if (!jobListingId || typeof jobListingId !== 'string' || !validateUUID(jobListingId)) {
+      return res.status(400).json({ error: 'Valid job listing ID (UUID) is required' });
     }
 
     // Check if job exists

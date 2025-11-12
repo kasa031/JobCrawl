@@ -12,10 +12,29 @@ export function validateEmail(email: string): boolean {
 
 /**
  * Validate password strength
- * Requirements: at least 8 characters
+ * Requirements: at least 8 characters, uppercase, lowercase, and number
  */
 export function validatePassword(password: string): boolean {
-  return password.length >= 8;
+  if (!password || password.length < 8) {
+    return false;
+  }
+  
+  // Check for uppercase letter
+  if (!/[A-ZÆØÅ]/.test(password)) {
+    return false;
+  }
+  
+  // Check for lowercase letter
+  if (!/[a-zæøå]/.test(password)) {
+    return false;
+  }
+  
+  // Check for number
+  if (!/[0-9]/.test(password)) {
+    return false;
+  }
+  
+  return true;
 }
 
 /**
@@ -28,10 +47,12 @@ export function validatePhoneNumber(phone: string): boolean {
 }
 
 /**
- * Validate UUID format
+ * Validate UUID format (supports UUID v4)
  */
 export function validateUUID(uuid: string): boolean {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuid || typeof uuid !== 'string') return false;
+  // UUID v4 format: 8-4-4-4-12 hexadecimal characters
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(uuid);
 }
 

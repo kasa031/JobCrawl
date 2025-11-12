@@ -4,9 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { aiAPI, profileAPI } from '../services/api';
 import LoginModal from '../components/LoginModal';
+import { useToast } from '../components/Toast';
 
 function AIGenerate() {
   const { isAuthenticated, showLoginModal, setShowLoginModal, user } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const [jobDescription, setJobDescription] = useState('');
   const [jobTitle, setJobTitle] = useState('');
@@ -27,7 +29,8 @@ function AIGenerate() {
       const profile = await profileAPI.getProfile();
       setHasCV(!!profile?.cvPath);
     } catch (error) {
-      console.error('Error loading profile:', error);
+      // Silently fail - CV status is not critical for this page
+      // User can still generate cover letters without CV
     }
   };
 
@@ -38,12 +41,12 @@ function AIGenerate() {
     }
 
     if (!jobDescription.trim()) {
-      alert('Vennligst lim inn stillingsbeskrivelsen først');
+      showToast('Vennligst lim inn stillingsbeskrivelsen først', 'error');
       return;
     }
 
     if (!user?.id) {
-      alert('User not found. Please log in again.');
+      showToast('Bruker ikke funnet. Vennligst logg inn igjen.', 'error');
       return;
     }
 
@@ -56,9 +59,10 @@ function AIGenerate() {
         jobDescription: jobDescription,
       });
       setGeneratedLetter(letterResponse.coverLetter);
+      showToast('Søknadsbrev generert!', 'success');
     } catch (error: any) {
-      console.error('Error generating:', error);
-      alert(error.response?.data?.error || 'Failed to generate cover letter');
+      const errorMessage = error.response?.data?.error || 'Kunne ikke generere søknadsbrev';
+      showToast(errorMessage, 'error');
     } finally {
       setLoading(false);
     }
@@ -196,7 +200,14 @@ function AIGenerate() {
                   className="w-full resize-none bg-white text-dark-text focus:outline-none"
                 />
                 <button
-                  onClick={() => navigator.clipboard.writeText(generatedLetter)}
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(generatedLetter);
+                      showToast('Kopiert til utklippstavle!', 'success');
+                    } catch (error) {
+                      showToast('Kunne ikke kopiere til utklippstavle', 'error');
+                    }
+                  }}
                   className="mt-4 bg-mocca-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-mocca-700 transition-colors"
                 >
                   Kopier til utklippstavle

@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import axios from 'axios';
+import { logInfo, logWarn, logError } from '../../config/logger';
 
 export class AIService {
   private openai: OpenAI | null = null;
@@ -14,35 +15,34 @@ export class AIService {
     if (provider === 'openrouter') {
       this.aiProvider = 'openrouter';
       this.openrouterApiKey = process.env.OPENROUTER_API_KEY || null;
-      console.log('🔍 AIService - Using OpenRouter (GRATIS tier)');
-      console.log(`   API Key exists: ${!!this.openrouterApiKey}`);
+      logInfo('AIService - Using OpenRouter (GRATIS tier)', { apiKeyExists: !!this.openrouterApiKey });
       if (this.openrouterApiKey) {
-        console.log('✅ OpenRouter API key found - using gratis modeller!');
+        logInfo('OpenRouter API key found - using gratis modeller!');
       } else {
-        console.warn('⚠️  OpenRouter API key not found. Get one at: https://openrouter.ai/keys');
+        logWarn('OpenRouter API key not found. Get one at: https://openrouter.ai/keys');
       }
     } else if (provider === 'gemini') {
       this.aiProvider = 'gemini';
       this.geminiApiKey = process.env.GEMINI_API_KEY || null;
-      console.log('🔍 AIService - Using Google Gemini (GRATIS tier)');
-      console.log(`   API Key exists: ${!!this.geminiApiKey}`);
+      logInfo('AIService - Using Google Gemini (GRATIS tier)', { apiKeyExists: !!this.geminiApiKey });
       if (this.geminiApiKey) {
-        console.log('✅ Gemini API key found - using gratis tier!');
+        logInfo('Gemini API key found - using gratis tier!');
       } else {
-        console.warn('⚠️  Gemini API key not found. Get one at: https://aistudio.google.com/app/apikey');
+        logWarn('Gemini API key not found. Get one at: https://aistudio.google.com/app/apikey');
       }
     } else {
       // Standard OpenAI
       this.aiProvider = 'openai';
       const apiKey = process.env.OPENAI_API_KEY;
-      console.log('🔍 AIService - Using OpenAI');
-      console.log(`   API Key exists: ${!!apiKey}`);
-      console.log(`   API Key starts with sk-: ${apiKey?.startsWith('sk-')}`);
-      console.log(`   API Key length: ${apiKey?.length || 0}`);
+      logInfo('AIService - Using OpenAI', {
+        apiKeyExists: !!apiKey,
+        apiKeyStartsWithSk: apiKey?.startsWith('sk-'),
+        apiKeyLength: apiKey?.length || 0,
+      });
       if (!apiKey || apiKey === 'your_openai_key_here') {
-        console.warn('⚠️  OpenAI API key not found. AI features will be limited.');
+        logWarn('OpenAI API key not found. AI features will be limited.');
       } else {
-        console.log('✅ OpenAI API key found and appears valid');
+        logInfo('OpenAI API key found and appears valid');
       }
       this.openai = new OpenAI({
         apiKey: apiKey || 'mock-key',
@@ -67,13 +67,25 @@ export class AIService {
     },
     cvText?: string
   ): Promise<string> {
-    const apiKey = process.env.OPENAI_API_KEY;
-    console.log('📝 generateCoverLetter called');
-    console.log(`   API Key check: ${!!apiKey && apiKey !== 'your_openai_key_here'}`);
-    console.log(`   Has CV text: ${!!cvText}, CV length: ${cvText?.length || 0}`);
+    logInfo('generateCoverLetter called', {
+      provider: this.aiProvider,
+      hasCVText: !!cvText,
+      cvLength: cvText?.length || 0,
+    });
     
-    if (!apiKey || apiKey === 'your_openai_key_here') {
-      console.warn('⚠️  OPENAI_API_KEY not set, returning mock cover letter');
+    // Check if we have a valid API key for the selected provider
+    let hasValidApiKey = false;
+    if (this.aiProvider === 'openrouter') {
+      hasValidApiKey = !!this.openrouterApiKey;
+    } else if (this.aiProvider === 'gemini') {
+      hasValidApiKey = !!this.geminiApiKey;
+    } else {
+      const apiKey = process.env.OPENAI_API_KEY;
+      hasValidApiKey = !!apiKey && apiKey !== 'your_openai_key_here';
+    }
+    
+    if (!hasValidApiKey) {
+      logWarn(`${this.aiProvider.toUpperCase()} API key not set, returning mock cover letter`);
       return this.getMockCoverLetter(jobTitle, company, userProfile);
     }
 
@@ -122,10 +134,11 @@ SKRIV NÅ et utfyllende søknadsbrev.`;
         // Standard OpenAI
         const modelToUse = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
         
-        console.log('🚀 Calling OpenAI API...');
-        console.log(`   Model: ${modelToUse}`);
-        console.log(`   System message length: ${systemMessage.length}`);
-        console.log(`   User prompt length: ${prompt.length}`);
+        logInfo('Calling OpenAI API', {
+          model: modelToUse,
+          systemMessageLength: systemMessage.length,
+          promptLength: prompt.length,
+        });
         
         if (!this.openai) {
           throw new Error('OpenAI client not initialized');
@@ -153,51 +166,52 @@ SKRIV NÅ et utfyllende søknadsbrev.`;
       
       // Log the response for debugging (kun for OpenAI)
       if (this.aiProvider === 'openai') {
-        console.log(`✅ OpenAI API called successfully. Response length: ${generatedText.length} characters`);
+        logInfo('OpenAI API called successfully', { responseLength: generatedText.length });
         if (generatedText.length < 300) {
-          console.warn(`⚠️  WARNING: Generated cover letter is very short (${generatedText.length} chars). This might indicate an issue.`);
-          console.log('Generated text preview:', generatedText.substring(0, 200));
+          logWarn(`Generated cover letter is very short (${generatedText.length} chars). This might indicate an issue.`, {
+            preview: generatedText.substring(0, 200),
+          });
         } else {
-          console.log(`✅ Generated cover letter is ${generatedText.length} characters - looks good!`);
+          logInfo(`Generated cover letter is ${generatedText.length} characters - looks good!`);
         }
       }
       
       return generatedText;
     } catch (error: any) {
-      console.error('❌ Error generating cover letter with AI:', error);
-      console.error('Error details:', {
+      logError('Error generating cover letter with AI', error as Error, {
         message: error.message,
         status: error.status,
         code: error.code,
         type: error.type,
-        response: error.response?.data
+        response: error.response?.data,
       });
       
       // If it's an authentication error, log it clearly
       if (error.status === 401 || error.message?.includes('Incorrect API key') || error.message?.includes('Invalid API key') || error.message?.includes('401')) {
-        console.error('🚨 OPENAI API KEY ERROR: The API key appears to be invalid or incorrect!');
-        console.error(`   API Key starts with: ${process.env.OPENAI_API_KEY?.substring(0, 10)}...`);
-        console.error(`   API Key length: ${process.env.OPENAI_API_KEY?.length || 0}`);
+        logError('OPENAI API KEY ERROR: The API key appears to be invalid or incorrect!', error as Error, {
+          apiKeyPrefix: process.env.OPENAI_API_KEY?.substring(0, 10),
+          apiKeyLength: process.env.OPENAI_API_KEY?.length || 0,
+        });
       }
       
       // If it's a quota/billing error, log it clearly
       if (error.status === 429 || error.code === 'insufficient_quota' || error.message?.includes('quota') || error.message?.includes('billing')) {
-        console.error('🚨 OPENAI QUOTA ERROR: Du har ikke nok credits eller mangler betalingsinformasjon!');
-        console.error('   Gå til: https://platform.openai.com/account/billing');
-        console.error('   Du må legge til betalingsmetode eller kjøpe credits for å bruke API-et.');
+        logError('OPENAI QUOTA ERROR: Du har ikke nok credits eller mangler betalingsinformasjon!', error as Error, {
+          billingUrl: 'https://platform.openai.com/account/billing',
+        });
       }
       
       // OpenRouter spesifikke feil
       if (this.aiProvider === 'openrouter') {
-        console.error('🚨 OPENROUTER ERROR - Sjekk følgende:');
-        console.error(`   API Key: ${this.openrouterApiKey ? '✅ Funnet' : '❌ Mangler'}`);
-        console.error(`   Error: ${error.message}`);
-        console.error(`   Response: ${JSON.stringify(error.response?.data || 'Ingen response data')}`);
+        logError('OPENROUTER ERROR - Sjekk følgende', error as Error, {
+          apiKeyFound: !!this.openrouterApiKey,
+          errorMessage: error.message,
+          responseData: error.response?.data,
+        });
       }
       
       // Return mock as fallback
-      console.warn('⚠️  Falling back to mock cover letter due to error');
-      console.warn(`   Provider used: ${this.aiProvider}`);
+      logWarn('Falling back to mock cover letter due to error', { provider: this.aiProvider });
       return this.getMockCoverLetter(jobTitle, company, userProfile);
     }
   }
@@ -285,7 +299,7 @@ Returner KUN en JSON-array med søketermene, ingen annen tekst:
       // Fallback
       return this.simpleKeywordExpansion(trimmed);
     } catch (error) {
-      console.error('Error expanding keywords with AI:', error);
+      logError('Error expanding keywords with AI', error as Error);
       return this.simpleKeywordExpansion(trimmed);
     }
   }
@@ -372,7 +386,7 @@ Svar kun med "JA" eller "NEI".`;
       return jobTitle.toLowerCase().includes(searchLower) || 
              jobDescription.toLowerCase().includes(searchLower);
     } catch (error) {
-      console.error('Error matching job with AI:', error);
+      logError('Error matching job with AI', error as Error);
       // Fallback til enkel matching ved feil
       const searchLower = searchTerm.toLowerCase();
       return jobTitle.toLowerCase().includes(searchLower) || 
@@ -389,7 +403,18 @@ Svar kun med "JA" eller "NEI".`;
     jobTitle: string,
     jobDescription: string
   ): Promise<{ score: number; explanation: string }> {
-    if (!process.env.OPENAI_API_KEY) {
+    // Check if we have a valid API key for the selected provider
+    let hasValidApiKey = false;
+    if (this.aiProvider === 'openrouter') {
+      hasValidApiKey = !!this.openrouterApiKey;
+    } else if (this.aiProvider === 'gemini') {
+      hasValidApiKey = !!this.geminiApiKey;
+    } else {
+      const apiKey = process.env.OPENAI_API_KEY;
+      hasValidApiKey = !!apiKey && apiKey !== 'your_openai_key_here';
+    }
+    
+    if (!hasValidApiKey) {
       return this.getMockMatchScore(jobRequirements, userSkills);
     }
 
@@ -431,7 +456,7 @@ Respond in JSON format with:
       const result = JSON.parse(response.choices[0]?.message?.content || '{"score":50,"explanation":"Ungen match"}');
       return result;
     } catch (error) {
-      console.error('Error matching job with AI:', error);
+      logError('Error matching job with AI', error as Error);
       return this.getMockMatchScore(jobRequirements, userSkills);
     }
   }
@@ -443,7 +468,18 @@ Respond in JSON format with:
     userSkills: string[],
     targetJobTitles: string[]
   ): Promise<string[]> {
-    if (!process.env.OPENAI_API_KEY) {
+    // Check if we have a valid API key for the selected provider
+    let hasValidApiKey = false;
+    if (this.aiProvider === 'openrouter') {
+      hasValidApiKey = !!this.openrouterApiKey;
+    } else if (this.aiProvider === 'gemini') {
+      hasValidApiKey = !!this.geminiApiKey;
+    } else {
+      const apiKey = process.env.OPENAI_API_KEY;
+      hasValidApiKey = !!apiKey && apiKey !== 'your_openai_key_here';
+    }
+    
+    if (!hasValidApiKey) {
       return [
         'Vurder å lære flere relevante verktøy',
         'Tilegn deg mer erfaring innen ditt felt',
@@ -487,7 +523,7 @@ Respond with only a JSON array of suggestions in Norwegian:
       const suggestions = JSON.parse(response.choices[0]?.message?.content || '[]');
       return suggestions;
     } catch (error) {
-      console.error('Error generating profile suggestions:', error);
+      logError('Error generating profile suggestions', error as Error);
       return [
         'Vurder å lære flere relevante verktøy',
         'Tilegn deg mer erfaring innen ditt felt',
@@ -667,10 +703,11 @@ START Å SKRIVE NÅ. Hver setning må ha et ankerpunkt i CV-innholdet du har få
     // Bruk gratis modeller fra OpenRouter
     const modelToUse = process.env.OPENROUTER_MODEL || 'mistralai/mistral-7b-instruct:free'; // Gratis modell
     
-    console.log('🚀 Calling OpenRouter API (GRATIS)...');
-    console.log(`   Model: ${modelToUse}`);
-    console.log(`   System message length: ${systemMessage.length}`);
-    console.log(`   User prompt length: ${prompt.length}`);
+    logInfo('Calling OpenRouter API (GRATIS)', {
+      model: modelToUse,
+      systemMessageLength: systemMessage.length,
+      promptLength: prompt.length,
+    });
 
     try {
       const response = await axios.post(
@@ -701,15 +738,18 @@ START Å SKRIVE NÅ. Hver setning må ha et ankerpunkt i CV-innholdet du har få
       );
 
       const generatedText = response.data.choices[0]?.message?.content || '';
-      console.log(`✅ OpenRouter API called successfully. Response length: ${generatedText.length} characters`);
+      logInfo('OpenRouter API called successfully', { responseLength: generatedText.length });
       if (generatedText.length < 300) {
-        console.warn(`⚠️  WARNING: Generated cover letter is very short (${generatedText.length} chars).`);
+        logWarn(`Generated cover letter is very short (${generatedText.length} chars).`);
       } else {
-        console.log(`✅ Generated cover letter is ${generatedText.length} characters - looks good!`);
+        logInfo(`Generated cover letter is ${generatedText.length} characters - looks good!`);
       }
       return generatedText;
     } catch (error: any) {
-      console.error('❌ Error calling OpenRouter API:', error.response?.data || error.message);
+      logError('Error calling OpenRouter API', error as Error, {
+        responseData: error.response?.data,
+        errorMessage: error.message,
+      });
       throw error;
     }
   }
@@ -722,9 +762,10 @@ START Å SKRIVE NÅ. Hver setning må ha et ankerpunkt i CV-innholdet du har få
       throw new Error('Gemini API key not set');
     }
 
-    console.log('🚀 Calling Google Gemini API (GRATIS)...');
-    console.log(`   Model: gemini-1.5-flash`); // Gratis modell
-    console.log(`   Combined prompt length: ${systemMessage.length + prompt.length}`);
+    logInfo('Calling Google Gemini API (GRATIS)', {
+      model: 'gemini-1.5-flash',
+      combinedPromptLength: systemMessage.length + prompt.length,
+    });
 
     try {
       // Gemini kombinerer system og user message
@@ -756,15 +797,18 @@ START Å SKRIVE NÅ. Hver setning må ha et ankerpunkt i CV-innholdet du har få
       );
 
       const generatedText = response.data.candidates[0]?.content?.parts[0]?.text || '';
-      console.log(`✅ Gemini API called successfully. Response length: ${generatedText.length} characters`);
+      logInfo('Gemini API called successfully', { responseLength: generatedText.length });
       if (generatedText.length < 300) {
-        console.warn(`⚠️  WARNING: Generated cover letter is very short (${generatedText.length} chars).`);
+        logWarn(`Generated cover letter is very short (${generatedText.length} chars).`);
       } else {
-        console.log(`✅ Generated cover letter is ${generatedText.length} characters - looks good!`);
+        logInfo(`Generated cover letter is ${generatedText.length} characters - looks good!`);
       }
       return generatedText;
     } catch (error: any) {
-      console.error('❌ Error calling Gemini API:', error.response?.data || error.message);
+      logError('Error calling Gemini API', error as Error, {
+        responseData: error.response?.data,
+        errorMessage: error.message,
+      });
       throw error;
     }
   }
